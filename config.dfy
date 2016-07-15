@@ -1,3 +1,4 @@
+abstract module orca{
 ////////////////////CONFIG////////////////////
 datatype Config = createConfig(heap: Heap, actors: Actors)
 
@@ -46,56 +47,101 @@ type ClassId = int
 type VarId = int
 
 //type Class = map<ActorAddr, ClassId>
-//pass maps around?
 //now that Class is not a map, sees needs the config 
-function sees(a: ActorAddr, sp: SP, c: Config) : Capability
+/*
+predicate sees(a: ActorAddr, sp: SP, c: Config, cappa: Capability)
 {
-    //all_actors_in_config();
-    if 0 <= a < |c.actors| then sees'(c.actors[a].cl, sp) else Capability.ERR
+    if 0 <= a < |c.actors| then sees'(c.actors[a].cl, sp, cappa) else false 
+}
+*/
+
+//predicate sees(cid: ClassId, sp: SP, cappa: Capability)
+
+function sees(cid: ClassId, sp: SP) : Capability
+
+lemma {:verify true} A1(a: Actor, sp: SP, f: FId, cappa: Capability) 
+requires sees(a.cl, SP.cons(sp, f)) == cappa //pass cappa as param instead?
+ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp) == cappa' 
+
+
+lemma {:verify true} A2(a: Actor, sp: SP, f: FId) 
+requires sees(a.cl, SP.cons(sp, f)) == WRITE
+ensures sees(a.cl, sp) == WRITE
+
+/*
+lemma {:verify true} A1(a: Actor, sp: SP, f: FId, cappa: Capability) 
+requires sees(a.cl, SP.cons(sp, f), cappa) //pass cappa as param instead?
+ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa')  
+{
+    assume true;
+    //assume exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa');
+    //assert exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa');
 }
 
-function sees'(cid: ClassId, sp: SP) : Capability
+lemma {:verify true} A2(c: Config, a: Actor, sp: SP, f: FId) 
+requires sees(a.cl, SP.cons(sp, f), WRITE)
+ensures sees(a.cl, sp, WRITE)
+{
+    assume sees(a.cl, sp, WRITE);
+}
+*/
+/*
+DO NOT VERIFY
+lemma {:verify false} A1(a: Actor, sp: SP, f: FId, cappa: Capability) 
+requires sees(a.cl, SP.cons(sp, f), cappa) //pass cappa as param instead?
+ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa')  
+{
+}
 
-lemma A1(c: Config, a: ActorAddr, sp: SP, f: FId, cappa: Capability) 
+lemma {:verify false} A2(c: Config, a: Actor, sp: SP, f: FId) 
+requires sees(a.cl, SP.cons(sp, f), WRITE)
+ensures sees(a.cl, sp, WRITE)
+{
+}
+*/
+
+/*
+OLD VERSION
+lemma {:verify false} A1(c: Config, a: ActorAddr, sp: SP, f: FId, cappa: Capability) 
 requires sees(a, SP.cons(sp, f), c) == cappa //pass cappa as param instead?
-//requires sees(cl, c, a, SP.cons(sp, f)) == _ 
-ensures exists cappa' :: cappa' != TAG && sees(a, sp, c) == cappa'
+ensures exists cappa' :: cappa' != TAG && sees(a, sp, c) == cappa' 
+{
+}
 
-lemma A2(c: Config, a: ActorAddr, sp: SP, f: FId) 
+lemma {:verify false} A2(c: Config, a: ActorAddr, sp: SP, f: FId) 
 requires sees(a, SP.cons(sp, f), c) == WRITE
 ensures sees(a, sp, c) == WRITE
-
-/*function method C_ver0(a: ActorAddr, dp: DP, c: Config) : Addr 
 {
-    all_actors_in_config();
-    match dp 
-    case This => AA(a)
-    //case LP(zero, x) => if c.actors[a].st == exe(f: Frame) then {Capability.ERR} else {ERR}
-    case MP(k, x) => 
-        match c.actors[a].q[k] 
-        case app(f) => f.Map[x]
-        case orca(_, _) => Addr.ERR
-    case LP(zero, x) => 
-        match c.actors[a].st 
-        //add wf of frames?
-        case exe(f) => if x in f.Map then f.Map[x] else Addr.ERR
-        case snd(_, _, _, _) => Addr.ERR
-        case idl => Addr.ERR
-        case mkU(_) => Addr.ERR
-        case trc(_) => Addr.ERR
-        case mkR(_) => Addr.ERR
-        case cll(_) => Addr.ERR
-}*/
+}
+*/
 
+/*
+//TODO: USELESS REMOVE
+predicate MP_wf(a: Actor, k: int) 
+{
+    0 <= k < |a.q| 
+}
+
+//TODO: USELESS REMOVE
+//can we assume this?
+lemma {:verify false} all_actors_in_config()
+ensures forall a: ActorAddr, c: Config :: 0 <= a < |c.actors|
+{
+}
+*/
 
 //C FINAL 
+//TODO: WRITE FUNCTIONS FOR THINGS LIKE msg.f.Map[x] -> F(msg, x)
 function method C(a: ActorAddr, dp: DP, c: Config) : Addr 
 {
-    all_actors_in_config();
+    //TODO: REMOVE ASSUMPTION
+    assume 0 <= a < |c.actors|;
     match dp 
     case This => AA(a)
     case MP(k, x) => 
-        (MP_wf(c.actors[a], k);
+        (
+        //TODO: REMOVE ASSUMPTION
+        assume 0 <= k < |c.actors[a].q|;
         var msg := c.actors[a].q[k];
         if msg.app? then 
             (if x in msg.f.Map then msg.f.Map[x] else Addr.ERR) 
@@ -110,82 +156,8 @@ function method C(a: ActorAddr, dp: DP, c: Config) : Addr
         var obj := c.heap.objs[C(a, p, c)];
         if f in obj then obj[f] else Addr.ERR
 }
-
-lemma MP_wf(a: Actor, k: int) 
-ensures 0 <= k < |a.q| 
-
-//can we assume this?
-lemma all_actors_in_config()
-ensures forall a: ActorAddr, c: Config :: 0 <= a < |c.actors|
-
-function method valid_addr(l: Addr) : bool {
+//TODO: USE PREDICATE OR REMOVE 
+function valid_addr(l: Addr) : bool {
     true
 }
-
-/*
-//C: HELPER FUNCTIONS }
-function method C'(a: ActorAddr, dp: DP, c: Config) : Addr 
-{
-    all_actors_in_config();
-    match dp 
-    case This => AA(a)
-    case MP(k, x) =>
-        MP_wf(c.actors[a], k);
-        CMP(k, x, c, c.actors[a]) 
-    case LP(zero, x) =>
-        CLP(zero, x, c, c.actors[a]) 
-    case cons(p, f) => 
-        assume C(a, p, c) in c.heap.objs;
-        var obj := c.heap.objs[C(a, p, c)];
-        if f in obj then obj[f] else Addr.ERR
 }
-
-function method CLP(zero: int, x: VarId, c: Config, a: Actor) : Addr
-{   
-    match a.st 
-    //add wf of frames?
-    case exe(f) => if x in f.Map then f.Map[x] else Addr.ERR
-    case snd(_, _, _, _) => Addr.ERR
-    case idl => Addr.ERR
-    case mkU(_) => Addr.ERR
-    case trc(_) => Addr.ERR
-    case mkR(_) => Addr.ERR
-    case cll(_) => Addr.ERR
-}
-
-function method CMP(k: int, x: VarId, c: Config, a: Actor) : Addr
-requires 0 <= k < |a.q|
-{
-    assert 0 <= k < |a.q|;
-    match a.q[k] 
-    case app(f) => if x in f.Map then f.Map[x] else Addr.ERR
-    case orca(_, _) => Addr.ERR
-}
-
-
-//C: ALL IN ONE
-function method C''(a: ActorAddr, dp: DP, c: Config) : Addr 
-{
-    all_actors_in_config();
-    if dp.This? then 
-        AA(a) 
-    else if dp.MP? then (
-        MP_wf(c.actors[a], dp.k);
-        match c.actors[a].q[dp.k] 
-        case app(f) => if dp.x' in f.Map then f.Map[dp.x'] else Addr.ERR
-        case orca(_, _) => Addr.ERR
-        )
-    else if dp.LP? then (
-        match c.actors[a].st 
-        //add wf of frames?
-        case exe(f) => if dp.x in f.Map then f.Map[dp.x] else Addr.ERR
-        case snd(_, _, _, _) => Addr.ERR
-        case idl => Addr.ERR
-        case mkU(_) => Addr.ERR
-        case trc(_) => Addr.ERR
-        case mkR(_) => Addr.ERR
-        case cll(_) => Addr.ERR
-         )
-    else 
-       Addr.ERR
-}*/
