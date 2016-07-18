@@ -48,14 +48,7 @@ type VarId = int
 
 //type Class = map<ActorAddr, ClassId>
 //now that Class is not a map, sees needs the config 
-/*
-predicate sees(a: ActorAddr, sp: SP, c: Config, cappa: Capability)
-{
-    if 0 <= a < |c.actors| then sees'(c.actors[a].cl, sp, cappa) else false 
-}
-*/
 
-//predicate sees(cid: ClassId, sp: SP, cappa: Capability)
 
 function sees(cid: ClassId, sp: SP) : Capability
 
@@ -68,52 +61,6 @@ lemma {:verify true} A2(a: Actor, sp: SP, f: FId)
 requires sees(a.cl, SP.cons(sp, f)) == WRITE
 ensures sees(a.cl, sp) == WRITE
 
-/*
-lemma {:verify true} A1(a: Actor, sp: SP, f: FId, cappa: Capability) 
-requires sees(a.cl, SP.cons(sp, f), cappa) //pass cappa as param instead?
-ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa')  
-{
-    assume true;
-    //assume exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa');
-    //assert exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa');
-}
-
-lemma {:verify true} A2(c: Config, a: Actor, sp: SP, f: FId) 
-requires sees(a.cl, SP.cons(sp, f), WRITE)
-ensures sees(a.cl, sp, WRITE)
-{
-    assume sees(a.cl, sp, WRITE);
-}
-*/
-/*
-DO NOT VERIFY
-lemma {:verify false} A1(a: Actor, sp: SP, f: FId, cappa: Capability) 
-requires sees(a.cl, SP.cons(sp, f), cappa) //pass cappa as param instead?
-ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp, cappa')  
-{
-}
-
-lemma {:verify false} A2(c: Config, a: Actor, sp: SP, f: FId) 
-requires sees(a.cl, SP.cons(sp, f), WRITE)
-ensures sees(a.cl, sp, WRITE)
-{
-}
-*/
-
-/*
-OLD VERSION
-lemma {:verify false} A1(c: Config, a: ActorAddr, sp: SP, f: FId, cappa: Capability) 
-requires sees(a, SP.cons(sp, f), c) == cappa //pass cappa as param instead?
-ensures exists cappa' :: cappa' != TAG && sees(a, sp, c) == cappa' 
-{
-}
-
-lemma {:verify false} A2(c: Config, a: ActorAddr, sp: SP, f: FId) 
-requires sees(a, SP.cons(sp, f), c) == WRITE
-ensures sees(a, sp, c) == WRITE
-{
-}
-*/
 
 /*
 //TODO: USELESS REMOVE
@@ -156,6 +103,7 @@ function method C(a: ActorAddr, dp: DP, c: Config) : Addr
         var obj := c.heap.objs[C(a, p, c)];
         if f in obj then obj[f] else Addr.ERR
 }
+
 //TODO: USE PREDICATE OR REMOVE 
 function valid_addr(l: Addr) : bool {
     true
