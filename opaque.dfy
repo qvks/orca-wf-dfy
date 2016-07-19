@@ -112,6 +112,7 @@ abstract module Opaque{
     predicate actor_state_exe(c: Config, a: ActorAddr)
     function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame 
     function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
+    
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
         actor_state_rcv(c, a) &&
@@ -123,13 +124,15 @@ abstract module Opaque{
         (forall i :: i in actor_ws(c,a) && !Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) + 1) &&
         (forall i :: i !in actor_ws(c,a) ==> RC(c', i, a) == RC(c, i, a)) &&
         //TODO: TAKE THIS OUT INTO OWNERSHIP_PRESERVED(C)
-        (forall i, a' :: Owner(c,i,a') == Owner(c',i,a'))
+        (forall i, a' :: Owner(c,i,a') == Owner(c',i,a')) &&
+        (forall i, a' :: a' != a ==> RC(c', i, a') == RC(c, i, a'))
     } 
 
     lemma RcvToExe_Increases_A(c: Config, a: ActorAddr, c': Config)
         requires RcvToExe(c, a, c')
         ensures forall lp, i, k :: A(c, a, lp, i, k) ==> A(c', a, lp, i, k)
         ensures forall lp, i, k :: A(c', a, lp, i, k) ==> A(c, a, lp, i, k) || i in actor_ws(c, a)
+        ensures forall lp, i, k, a' :: a' != a ==> A(c', a', lp, i, k) == A(c, a', lp, i, k)
     
     ////INVARIANTS////
     predicate INV_2(c: Config) 
@@ -142,21 +145,21 @@ abstract module Opaque{
             A(c, a', p, i, k) ==> 
             LRC(c,i)
     }*/
-    predicate INV_3(c: Config, a: ActorAddr) {
-        forall i, lp, k :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
+    predicate INV_3(c: Config) {
+        forall i, lp, k, a :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
     }
 
-    lemma RcvToExe_preserves_INV_3(c: Config, a: ActorAddr, c': Config) 
-        requires INV_3(c, a) 
-        requires RcvToExe(c, a, c')
-        ensures INV_3(c', a)
+    lemma RcvToExe_preserves_INV_3(c: Config, a': ActorAddr, c': Config) 
+        requires INV_3(c) 
+        requires RcvToExe(c, a', c')
+        ensures INV_3(c')
     {
-        RcvToExe_Increases_A(c, a, c');
-        forall i, lp, k | A(c', a, lp, i, k) &&
+        RcvToExe_Increases_A(c, a', c');
+        forall i, lp, k, a | A(c', a, lp, i, k) &&
                           !Owner(c, i ,a)
             ensures RC(c', i, a) > 0     
         {
-            if i in actor_ws(c, a) {
+            if a' == a && i in actor_ws(c, a) {
                 assert RC(c, i, a) >= 0;
                 assert RC(c', i, a) == RC(c, i, a) + 1;
             } else {
