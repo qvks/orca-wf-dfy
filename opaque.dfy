@@ -13,6 +13,7 @@ abstract module Opaque{
     datatype Msg = orca(i: Addr, z: int) | app(f: Frame) | ERR 
     type FId 
     function Heap(c: Config, i: Addr, fid: FId) : Addr 
+    function allocated_addresses(c: Config) : set<Addr>
     
 
     ////ADDRESSES////
@@ -58,13 +59,114 @@ abstract module Opaque{
     }
     
 //TODO: Complete pop
-    predicate pop(c:Config, a:ActorAddr, msg: Msg, c': Config){true} 
-        
+    predicate pop(c:Config, a:ActorAddr, c': Config) 
+    
+    datatype Capability = WRITE | READ | TAG | ERR
+    type DP 
+    type SP
+    
+    datatype Optional<T> = Some(o: T) | None 
+    predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
+    
+    predicate DFR(c: Config) {
+        forall a, a': ActorAddr, p, p': DP, i: Addr, k: Capability:: 
+            a != a' && 
+            A(c, a, p, i, WRITE) &&
+            A(c, a', p', i, k) ==> 
+            k == TAG
+    }
 
+    predicate actor_state_idle(c: Config, a: ActorAddr)
+    predicate queue_head_app(c: Config, a: ActorAddr)
+        ensures queue_length(c, a) > 0
+    predicate actor_state_rcv(c: Config, a: ActorAddr)
+    function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
+        requires n < queue_length(c, a) 
+    function actor_ws(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_rcv(c, a)
+    function queue_head_iotas(c: Config, a: ActorAddr) : set<Addr>
+        requires queue_head_app(c, a)
+    
+    predicate RcvApp(c: Config, a: ActorAddr, c': Config) 
+        requires actor_state_idle(c, a)  
+        requires queue_head_app(c, a)
+    {
+        actor_state_rcv(c', a) &&
+        //0 here, 1 in the paper, leave which one?
+        actor_ws(c', a) == set i | 
+            i in allocated_addresses(c) &&
+            exists mp,k ::
+            mp in paths_from_message_n(c,a,0) &&
+            A(c,a,mp,i,k)
+    }
+    
+    ////REFERENCE COUNTS////
+    function RC(c: Config, i: Addr, a: ActorAddr) : nat 
+    function OMC(c: Config, i: Addr) : int
+    function LRC(c: Config, i: Addr) : int
+    function FRC(c: Config, i: Addr) : int
+    function AMC(c: Config, i: Addr) : int 
+    //{|(set x | exists a,k :: 0<=k<queue_length(c, a) && x==(a,k) && Reach(c,a,k,i))|}
+    
+    predicate Owner(c: Config, i: Addr, a: ActorAddr)
+    predicate actor_state_exe(c: Config, a: ActorAddr)
+    function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame 
+    function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
+    predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
+    {
+        actor_state_rcv(c, a) &&
+        queue_head_app(c, a) &&
+        actor_state_exe(c', a) && 
+        actor_state_exe_frame(c', a) == frame_from_app_message_n(c,a,0) &&
+        pop(c,a,c') &&
+        (forall i :: i in actor_ws(c,a) && Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) - 1) &&
+        (forall i :: i in actor_ws(c,a) && !Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) + 1) &&
+        (forall i :: i !in actor_ws(c,a) ==> RC(c', i, a) == RC(c, i, a)) &&
+        //TODO: TAKE THIS OUT INTO OWNERSHIP_PRESERVED(C)
+        (forall i, a' :: Owner(c,i,a') == Owner(c',i,a'))
+    } 
 
+    lemma RcvToExe_Increases_A(c: Config, a: ActorAddr, c': Config)
+        requires RcvToExe(c, a, c')
+        ensures forall lp, i, k :: A(c, a, lp, i, k) ==> A(c', a, lp, i, k)
+        ensures forall lp, i, k :: A(c', a, lp, i, k) ==> A(c, a, lp, i, k) || i in actor_ws(c, a)
+    
+    ////INVARIANTS////
+    predicate INV_2(c: Config) 
     /*
+    {
+        forall i, p, k :: 
+            (A(c, a, p, i, k) &&
+            !Owner(c, i, a)) || 
+            Owner(c,i,a') && 
+            A(c, a', p, i, k) ==> 
+            LRC(c,i)
+    }*/
+    predicate INV_3(c: Config, a: ActorAddr) {
+        forall i, lp, k :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
+    }
 
-
+    lemma RcvToExe_preserves_INV_3(c: Config, a: ActorAddr, c': Config) 
+        requires INV_3(c, a) 
+        requires RcvToExe(c, a, c')
+        ensures INV_3(c', a)
+    {
+        RcvToExe_Increases_A(c, a, c');
+        forall i, lp, k | A(c', a, lp, i, k) &&
+                          !Owner(c, i ,a)
+            ensures RC(c', i, a) > 0     
+        {
+            if i in actor_ws(c, a) {
+                assert RC(c, i, a) >= 0;
+                assert RC(c', i, a) == RC(c, i, a) + 1;
+            } else {
+                assert RC(c', i, a) == RC(c, i, a);
+                assert RC(c, i, a) > 0;
+                assert RC(c', i, a) > 0;
+            }
+        }
+    }
+/*
     //States// 
     datatype State = idl | exe(f: Frame) | snd(f': Frame, a: Actor, m: Msg, ws: Workset)
                 | mkU(ms: Marks) | trc(ms': Marks) | mkR(ms'': Marks) | cll(ms''': Marks)
@@ -150,4 +252,5 @@ abstract module Opaque{
         Actors(a,c).q.length
     }
   */  
+
 } 
