@@ -11,27 +11,32 @@ abstract module Opaque{
     type Actor 
     type Frame
     datatype Msg = orca(i: Addr, z: int) | app(f: Frame) | ERR 
-    type FId 
     function Heap(c: Config, i: Addr, fid: FId) : Addr 
     function allocated_addresses(c: Config) : set<Addr>
     
+    ////IDs////
+    type FId 
+    type BId  
+    type ClassId
+    type VarId
 
     ////ADDRESSES////
     datatype Addr = OA(ObjectAddr) | AA(ActorAddr) | Null
     type ObjectAddr 
     type ActorAddr
     
-
+    ////PATHS////
+    datatype Capability = WRITE | READ | TAG | ERR
+    type DP 
+    type SP
+    
+    datatype Optional<T> = Some(o: T) | None 
+    
     ////ACTORS////
-//    datatype Actor = Actor(st: State, cl: ClassId)
-    //lemma RANGE OF ACTORS IS FINITE
     //lemma all valid actor addresses are in the domain of Actors
     function Actors(c: Config, a: ActorAddr) : Actor
 
     //Queues//
-    //length added to convince Dafny that queues are finite 
-    //Is there a better way?
-    //datatype Queue = Queue(msg: Msg, length: int) //opaque - how?
     function queue_length(c: Config, a: ActorAddr) : nat 
     function queue_n(c: Config, a: ActorAddr, n: nat) : Msg 
 
@@ -41,15 +46,18 @@ abstract module Opaque{
     }
 
     predicate WF_queue(c: Config, a: ActorAddr) {
-        (forall n:nat :: n < queue_length(c,a) ==> queue_n(c, a, n) != Msg.ERR) &&
-        (forall n:nat :: n >= queue_length(c,a) ==> queue_n(c,a,n) == Msg.ERR)
+        (forall n: nat :: n < queue_length(c,a) ==> queue_n(c, a, n) != Msg.ERR) &&
+        (forall n: nat :: n >= queue_length(c,a) ==> queue_n(c,a,n) == Msg.ERR)
     }
 
     predicate push(c: Config, a: ActorAddr, msg: Msg, c': Config)
     {
-        WF_queue(c,a) && msg != Msg.ERR &&
-        queue_length(c', a) == queue_length(c, a) + 1 && queue_n(c', a, queue_length(c,a)) == msg &&
-        forall n:nat :: n != queue_length(c,a) ==> queue_n(c',a,n) == queue_n(c,a,n) 
+        WF_queue(c, a) && 
+        msg != Msg.ERR &&
+        queue_length(c', a) == queue_length(c, a) + 1 && 
+        queue_n(c', a, queue_length(c,a)) == msg &&
+        (forall n: nat :: n != queue_length(c,a) ==> 
+        queue_n(c', a, n) == queue_n(c, a, n))
     }
 
     lemma push_preserves_WF_queue(c: Config, a: ActorAddr, msg: Msg, c': Config) 
@@ -58,16 +66,31 @@ abstract module Opaque{
     {
     }
     
-//TODO: Complete pop
-    predicate pop(c:Config, a:ActorAddr, c': Config) 
+    predicate pop(c:Config, a:ActorAddr, c': Config)  
+    {
+        WF_queue(c, a) &&
+        queue_length(c', a) == queue_length(c, a) - 1 &&
+        forall n: nat :: n >= 0 ==>
+        queue_n(c', a, n) == queue_n(c, a, n+1) 
+    }
+
+    lemma pop_preserves_WF_queue(c: Config, a: ActorAddr, c': Config) 
+        requires pop(c, a, c')
+        ensures WF_queue(c', a)
+    {
+    }
     
-    datatype Capability = WRITE | READ | TAG | ERR
-    type DP 
-    type SP
-    
-    datatype Optional<T> = Some(o: T) | None 
+    ////REFERENCE COUNTS////
+    function RC(c: Config, i: Addr, a: ActorAddr) : nat 
+    function OMC(c: Config, i: Addr) : int
+    function LRC(c: Config, i: Addr) : int
+    function FRC(c: Config, i: Addr) : int
+    function AMC(c: Config, i: Addr) : int 
+    //{|(set x | exists a,k :: 0<=k<queue_length(c, a) && x==(a,k) && Reach(c,a,k,i))|}
+
     predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
-    
+
+    ////DATA RACE FREEDOM////
     predicate DFR(c: Config) {
         forall a, a': ActorAddr, p, p': DP, i: Addr, k: Capability:: 
             a != a' && 
@@ -75,18 +98,14 @@ abstract module Opaque{
             A(c, a', p', i, k) ==> 
             k == TAG
     }
-
-    predicate actor_state_idle(c: Config, a: ActorAddr)
-    predicate queue_head_app(c: Config, a: ActorAddr)
-        ensures queue_length(c, a) > 0
-    predicate actor_state_rcv(c: Config, a: ActorAddr)
-    function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
-        requires n < queue_length(c, a) 
-    function actor_ws(c: Config, a: ActorAddr) : set<Addr>
-        requires actor_state_rcv(c, a)
-    function queue_head_iotas(c: Config, a: ActorAddr) : set<Addr>
-        requires queue_head_app(c, a)
     
+    ////INVARIANTS////
+    predicate INV_2(c: Config) 
+    predicate INV_3(c: Config) {
+        forall i, lp, k, a :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
+    }
+    
+    ////RcvApp////
     predicate RcvApp(c: Config, a: ActorAddr, c': Config) 
         requires actor_state_idle(c, a)  
         requires queue_head_app(c, a)
@@ -100,18 +119,6 @@ abstract module Opaque{
             A(c,a,mp,i,k)
     }
     
-    ////REFERENCE COUNTS////
-    function RC(c: Config, i: Addr, a: ActorAddr) : nat 
-    function OMC(c: Config, i: Addr) : int
-    function LRC(c: Config, i: Addr) : int
-    function FRC(c: Config, i: Addr) : int
-    function AMC(c: Config, i: Addr) : int 
-    //{|(set x | exists a,k :: 0<=k<queue_length(c, a) && x==(a,k) && Reach(c,a,k,i))|}
-    
-    predicate Owner(c: Config, i: Addr, a: ActorAddr)
-    predicate actor_state_exe(c: Config, a: ActorAddr)
-    function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame 
-    function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
     
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
@@ -134,20 +141,6 @@ abstract module Opaque{
         ensures forall lp, i, k :: A(c', a, lp, i, k) ==> A(c, a, lp, i, k) || i in actor_ws(c, a)
         ensures forall lp, i, k, a' :: a' != a ==> A(c', a', lp, i, k) == A(c, a', lp, i, k)
     
-    ////INVARIANTS////
-    predicate INV_2(c: Config) 
-    /*
-    {
-        forall i, p, k :: 
-            (A(c, a, p, i, k) &&
-            !Owner(c, i, a)) || 
-            Owner(c,i,a') && 
-            A(c, a', p, i, k) ==> 
-            LRC(c,i)
-    }*/
-    predicate INV_3(c: Config) {
-        forall i, lp, k, a :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
-    }
 
     lemma RcvToExe_preserves_INV_3(c: Config, a': ActorAddr, c': Config) 
         requires INV_3(c) 
@@ -169,7 +162,35 @@ abstract module Opaque{
             }
         }
     }
-/*
+    
+    ////AUXILIARY FOR RcvApp////
+    predicate actor_state_idle(c: Config, a: ActorAddr)
+
+    predicate queue_head_app(c: Config, a: ActorAddr)
+        ensures queue_length(c, a) > 0
+
+    predicate actor_state_rcv(c: Config, a: ActorAddr)
+
+    function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
+        requires n < queue_length(c, a) 
+
+    function actor_ws(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_rcv(c, a)
+
+    function queue_head_iotas(c: Config, a: ActorAddr) : set<Addr>
+        requires queue_head_app(c, a)
+    
+    predicate Owner(c: Config, i: Addr, a: ActorAddr)
+
+    predicate actor_state_exe(c: Config, a: ActorAddr)
+
+    function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame 
+
+    function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
+
+}
+
+/* IGNORE
     //States// 
     datatype State = idl | exe(f: Frame) | snd(f': Frame, a: Actor, m: Msg, ws: Workset)
                 | mkU(ms: Marks) | trc(ms': Marks) | mkR(ms'': Marks) | cll(ms''': Marks)
@@ -253,7 +274,6 @@ abstract module Opaque{
     //TODO: separate into its own module
     function queue_length(c: Config, a: ActorAddr) : int {
         Actors(a,c).q.length
+    
     }
-  */  
-
 } 
