@@ -102,7 +102,7 @@ abstract module Opaque{
     ////INVARIANTS////
     predicate INV_2(c: Config) 
     predicate INV_3(c: Config) {
-        forall i, lp, k, a :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
+        forall i, dp, k, a :: A(c, a, dp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
     }
     
     ////RcvApp////
