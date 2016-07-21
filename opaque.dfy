@@ -104,7 +104,9 @@ abstract module Opaque{
     predicate INV_3(c: Config) {
         forall i, lp, k, a :: A(c, a, lp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
     }
-    
+
+    ///////////////PSEUDO CODE FOR RECEIVING MESSAGES (FIGURE 6)///////////////
+
     ////RcvApp////
     predicate RcvApp(c: Config, a: ActorAddr, c': Config) 
         requires actor_state_idle(c, a)  
@@ -189,6 +191,10 @@ abstract module Opaque{
     function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
 
 }
+    ///////////////PSEUDO CODE FOR RECEIVING AN ORCA MESSAGE (FIGURE 7)///////////////
+
+    ////rcvORCA////
+    
 
 /* IGNORE
     //States// 
@@ -213,7 +219,6 @@ abstract module Opaque{
     type ClassId
     type VarId
 
-   
     ////PATHS//// 
     datatype DP = This | LP(zero: int, x: VarId) | MP(k: int, x': VarId) | cons(dp: DP, f: FId)
     datatype SP = This | bsp(b: BId, x: VarId) | cons(sp: SP, f: FId)
