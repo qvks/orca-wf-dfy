@@ -81,7 +81,7 @@ abstract module Opaque{
     }
     
     ////REFERENCE COUNTS////
-    function RC(c: Config, i: Addr, a: ActorAddr) : nat 
+    function RC(c: Config, i: Addr, a: ActorAddr) : nat
     function OMC(c: Config, i: Addr) : int
     function LRC(c: Config, i: Addr) : int
     function FRC(c: Config, i: Addr) : int
@@ -100,10 +100,42 @@ abstract module Opaque{
     }
     
     ////INVARIANTS////
-    predicate INV_2(c: Config) 
-    predicate INV_3(c: Config) {
-        forall i, dp, k, a :: A(c, a, dp, i, k) && !Owner(c, i, a) ==> RC(c, i, a) > 0
+    predicate INV_2(c: Config) {
+        forall i, dp, mp, k, a, a_own :: 
+            (A(c, a, dp, i, k) && 
+            !Owner(c, i, a)) ||
+            (A(c, a_own, mp, i, k) &&
+            Owner(c, i, a_own) &&
+            is_a_message_path(c, mp)) ==>
+            LRC(c, i) > 0
+                             
     }
+    predicate is_a_message_path(c: Config, mp: DP) 
+ 
+    predicate INV_3(c: Config) {
+        forall i, dp, k, a :: 
+            A(c, a, dp, i, k) &&
+            !Owner(c, i, a) ==> 
+            RC(c, i, a) > 0
+    }
+
+
+    predicate INV_6(c: Config) {
+        forall i, n: nat, a ::
+        (Owner(c, i, a) && 
+        queue_at_n_orca(c, a, n) ==>
+        LRC(c, queue_at_n_orca_i(c, a, n)) > 0) &&
+        LRC(c, queue_at_n_orca_i(c, a, n)) + sum_over_queue(c, a, queue_length(c, a)) >= 0
+        
+    }
+
+    ////AUXILIARY FOR INV_6////
+    predicate queue_at_n_orca(c: Config, a: ActorAddr, n: nat)
+    function queue_at_n_orca_i(c: Config, a: ActorAddr, n: nat) : Addr
+    function queue_at_n_orca_z(c: Config, a: ActorAddr) : int 
+
+    function sum_over_queue(c: Config, a: ActorAddr, n: nat) : int 
+        requires n <= queue_length(c, a)
 
     ///////////////PSEUDO CODE FOR RECEIVING MESSAGES (FIGURE 6)///////////////
 
@@ -117,7 +149,7 @@ abstract module Opaque{
         actor_ws(c', a) == set i | 
             i in allocated_addresses(c) &&
             exists mp,k ::
-            mp in paths_from_message_n(c,a,0) &&
+            mp in paths_from_message_n(c, a, 0) &&
             A(c,a,mp,i,k)
     }
     
@@ -128,7 +160,7 @@ abstract module Opaque{
         queue_head_app(c, a) &&
         actor_state_exe(c', a) && 
         actor_state_exe_frame(c', a) == frame_from_app_message_n(c,a,0) &&
-        pop(c,a,c') &&
+        pop(c, a, c') &&
         (forall i :: i in actor_ws(c,a) && Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) - 1) &&
         (forall i :: i in actor_ws(c,a) && !Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) + 1) &&
         (forall i :: i !in actor_ws(c,a) ==> RC(c', i, a) == RC(c, i, a)) &&
@@ -190,11 +222,39 @@ abstract module Opaque{
 
     function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
 
-}
     ///////////////PSEUDO CODE FOR RECEIVING AN ORCA MESSAGE (FIGURE 7)///////////////
 
     ////rcvORCA////
+    predicate rcvORCA(c: Config, a: ActorAddr, c': Config) 
+        requires actor_state_idle(c, a)
+        requires queue_head_orca(c, a)
+        requires LRC(c, queue_head_orca_i(c, a)) > 0
+    {
+        pop(c, a, c') &&
+        RC(c', queue_head_orca_i(c, a), a) == 
+        RC(c, queue_head_orca_i(c, a), a) + queue_head_orca_z(c, a)
+    }
     
+    /*
+    lemma rcvORCA_preserves_INV_2(c: Config, a: ActorAddr, c': Config) 
+        requires INV_2(c)
+        requires rcvORCA(c, a, c')
+        ensures INV_2(c')
+    {
+        
+    } */   
+
+    predicate queue_head_orca(c: Config, a: ActorAddr)
+    function queue_head_orca_i(c: Config, a: ActorAddr) : Addr
+    function queue_head_orca_z(c: Config, a: ActorAddr) : int 
+
+    
+  
+//    lemma rcvORCA_changes_RC(c: Config, a: ActorAddr, c': Config)
+//        requires rcvORCA(c, a, c') 
+    
+        
+} 
 
 /* IGNORE
     //States// 
@@ -204,6 +264,7 @@ abstract module Opaque{
     type Workset = set<Addr> //opaque - how?
     datatype RU = R | U
     function Marks_to_RU(m: Marks) : RU
+
 
 
     ////MESSAGES////
