@@ -138,6 +138,10 @@ abstract module Opaque{
             A(c,a,mp,i,k)
     }
     
+    predicate Ownership_Immutable(c: Config, c': Config) 
+    {
+        forall i, a' :: Owner(c,i,a') == Owner(c',i,a') 
+    }
     
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
@@ -149,26 +153,26 @@ abstract module Opaque{
         (forall i :: i in actor_ws(c,a) && Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) - 1) &&
         (forall i :: i in actor_ws(c,a) && !Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) + 1) &&
         (forall i :: i !in actor_ws(c,a) ==> RC(c', i, a) == RC(c, i, a)) &&
-        //TODO: TAKE THIS OUT INTO OWNERSHIP_PRESERVED(C)
-        (forall i, a' :: Owner(c,i,a') == Owner(c',i,a')) &&
+        Ownership_Immutable(c, c') &&
         (forall i, a' :: a' != a ==> RC(c', i, a') == RC(c, i, a'))
     } 
 
-    lemma {:verify false} RcvToExe_Increases_A(c: Config, a: ActorAddr, c': Config)
+    lemma {:verify true} RcvToExe_Increases_A(c: Config, a: ActorAddr, c': Config)
         requires RcvToExe(c, a, c')
         ensures forall lp, i, k :: A(c, a, lp, i, k) ==> A(c', a, lp, i, k)
         ensures forall lp, i, k :: A(c', a, lp, i, k) ==> A(c, a, lp, i, k) || i in actor_ws(c, a)
         ensures forall lp, i, k, a' :: a' != a ==> A(c', a', lp, i, k) == A(c, a', lp, i, k)
     
 
-    lemma {:verify false} RcvToExe_preserves_INV_3(c: Config, a': ActorAddr, c': Config) 
+    lemma {:verify true} RcvToExe_Preserves_INV_3(c: Config, a': ActorAddr, c': Config) 
         requires INV_3(c) 
         requires RcvToExe(c, a', c')
         ensures INV_3(c')
     {
         RcvToExe_Increases_A(c, a', c');
-        forall i, lp, k, a | A(c', a, lp, i, k) &&
-                          !Owner(c', i ,a) 
+        forall i, lp, k, a | 
+            A(c', a, lp, i, k) &&
+            !Owner(c', i ,a) 
             ensures RC(c', i, a) > 0     
         {
             if a' == a && i in actor_ws(c, a) {
@@ -209,49 +213,125 @@ abstract module Opaque{
 
     ///////////////PSEUDO CODE FOR RECEIVING AN ORCA MESSAGE (FIGURE 7)///////////////
 
-    predicate INV_6(c: Config) {
-        forall n: nat, i, a ::
-        ((Owner(c, i, a) && 
-        queue_at_n_orca(c, a, n) &&
-        queue_at_n_orca_i(c, a, n) == i) ==>
-        (LRC(c, i) > 0 &&
-        forall m: nat :: m < queue_length(c, a) ==> 
-        LRC(c, i) + sum_over_queue_i(c, a, i, m) >= 0))
-        
-    }
 
     ////AUXILIARY FOR INV_6////
     predicate queue_at_n_orca(c: Config, a: ActorAddr, n: nat)
+        ensures queue_at_n_orca(c, a, n) ==> n <= queue_length(c, a)
+
     function queue_at_n_orca_i(c: Config, a: ActorAddr, n: nat) : Addr
     function queue_at_n_orca_z(c: Config, a: ActorAddr, n: nat) : int 
 
     function sum_over_queue_i(c: Config, a: ActorAddr, i: Addr, n: nat) : int 
         requires n <= queue_length(c, a)
+    //    ensures forall a: ActorAddr, i: Addr ::
+    //            queue_at_n_orca(c, a, 0) ==>
+    //            sum_over_queue_i(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
+    
     
     ////rcvORCA////
     predicate rcvORCA(c: Config, a: ActorAddr, c': Config) 
     {   
+        queue_at_n_orca(c, a, 0) &&
+    
         var i := queue_at_n_orca_i(c, a, 0);
         var z := queue_at_n_orca_z(c, a, 0);
 
-        LRC(c, queue_at_n_orca_i(c, a, 0)) > 0 &&
-        Owner(c, queue_at_n_orca_i(c, a, 0), a) &&
         queue_at_n_orca(c, a, 0) &&
         actor_state_idle(c, a) &&
-
         pop(c, a, c') &&
         RC(c', i, a) == RC(c, i, a) + z &&
-        LRC(c', i) == LRC(c, i) + z 
+        forall a' :: a' != a ==> unchanged_actor(c, a', c')
     }
     
-    lemma rcvORCA_preserves_INV_6(c: Config, a: ActorAddr, c': Config)
-        requires INV_6(c)
+    predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
+
+    lemma sum_over_orca_head_is_add_z(c: Config) 
+    //    ensures forall a: ActorAddr, i: Addr ::
+    //            queue_at_n_orca(c, a, 0) ==>
+    //            sum_over_queue_i(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
+    
+    
+    lemma rcvORCA_changes_LRC(c: Config, a: ActorAddr, c': Config)
         requires rcvORCA(c, a, c')
+        ensures forall n: nat, a', i :: 
+            a' != a ==> 
+            LRC(c', i) == LRC(c, i) && 
+            n < queue_length(c', a') && 
+            queue_length(c', a) == queue_length(c, a) ==> 
+            sum_over_queue_i(c', a', i, n) == sum_over_queue_i(c, a, i, n)
+    
+    predicate INV_6(c: Config) {
+        forall i, a :: Owner(c, i, a) ==>
+            (forall j: nat :: 
+                queue_at_n_orca(c, a, j) &&
+                queue_at_n_orca_i(c, a, j) == i ==>
+                LRC(c, i) > 0) &&
+            (forall n: nat :: 
+                n <= queue_length(c, a) ==>
+                LRC(c, i) + sum_over_queue_i(c, a, i, n) >= 0)
+    }
+
+    lemma rcvORCA_preserves_INV_6(c: Config, a': ActorAddr, c': Config)
+        requires INV_6(c)
+        requires rcvORCA(c, a', c')
         ensures INV_6(c')
     {
-       // forall n: nat, i, a | 
+        forall i, a, j: nat | 
+                Owner(c', i, a) &&
+                queue_at_n_orca(c', a, j) &&
+                queue_at_n_orca_i(c', a, j) == i 
+                ensures LRC(c', i) > 0
+        {
+            if a == a' {
+                assert true;
+            } else {
+                assume false; 
+            }
+        }
+        
+        forall i, a, n: nat | 
+                Owner(c', i, a) &&
+                n <= queue_length(c', a) 
+                ensures LRC(c', i) + sum_over_queue_i(c', a, i, n) >= 0
+        {
+            assume false;
+        }
     }
-    
+
+    /*
+    lemma rcvORCA_preserves_INV_6(c: Config, a': ActorAddr, c': Config)
+        requires INV_6(c)
+        requires rcvORCA(c, a', c')
+        ensures INV_6(c')
+    {
+        rcvORCA_changes_LRC(c, a', c');
+        sum_over_orca_head_is_add_z(c);
+        sum_over_orca_head_is_add_z(c');
+        forall n: nat, m: nat, i, a | 
+            Owner(c', i, a) &&
+            queue_at_n_orca(c', a, n) &&
+            queue_at_n_orca_i(c', a, n) == i &&
+            m < queue_length(c', a)
+            ensures LRC(c', i) > 0 
+            ensures LRC(c', i) + sum_over_queue_i(c', a, i, m) >= 0
+         {
+             if a' == a {
+                assert true;
+             } else {
+                assert LRC(c', i) == LRC(c, i);
+                assert LRC(c', i) > 0;
+             }
+            /*
+            var z := queue_at_n_orca_z(c, a, 0);
+            var i' := queue_at_n_orca_i(c', a, 0);
+            assert LRC(c, i) + z == LRC(c, i) + sum_over_queue_i(c, a, i, 0);
+            assert LRC(c, i) + z > 0;
+            assert LRC(c', i) == LRC(c, i) + z;
+            assert LRC(c', i) > 0;
+            */
+         }
+    }
+    */ 
     /*
     lemma rcvORCA_preserves_INV_2(c: Config, a: ActorAddr, c': Config) 
         requires INV_2(c)
