@@ -280,13 +280,13 @@ abstract module Opaque{
                 queue_at_n_orca(c, a, j) &&
                 queue_at_n_orca_i(c, a, j) == i ==>
                 LRC(c, i) > 0) &&
-            (forall n: nat :: 
+            (forall n: nat ::
                 0 < n <= queue_length(c, a) ==>
                     (forall j: nat ::
                         j >= n ==>
                             queue_at_n_orca(c, a, j) &&
                             queue_at_n_orca_i(c, a, j) == i ==>
-                            orca_effect(c, a, i, 0, n) + orca_effect(c, a, i, n, queue_length(c,a)) > 0)) && 
+                            orca_effect(c, a, i, 0, n) + sum_over_queue_i(c, a, i, n, queue_length(c,a)) > 0)) &&
             (forall n: nat ::
                 n <= queue_length(c, a) ==>
                 orca_effect(c, a, i, 0, n) >= 0)
@@ -297,8 +297,8 @@ abstract module Opaque{
         LRC(c, i) + sum_over_queue_i(c, a, i, incl, excl)
     }
 
-    lemma receive_orca_effect(c: Config, a: ActorAddr, c': Config, i: Addr, incl: nat, excl: nat) 
-        requires rcvORCA(c, a, c') 
+    lemma receive_orca_effect(c: Config, a: ActorAddr, c': Config, i: Addr, incl: nat, excl: nat)
+        requires rcvORCA(c, a, c')
         requires incl>0
         requires excl>=incl
         ensures sum_over_queue_i(c', a, i, incl-1, excl-1) == sum_over_queue_i(c, a, i, incl, excl)
@@ -306,9 +306,9 @@ abstract module Opaque{
     lemma sum_over_queue_is_recursive(c: Config, a: ActorAddr, i: Addr, excl: nat)
         requires queue_at_n_orca(c, a, 0)
         requires queue_at_n_orca_i(c, a, 0) == i
-        ensures sum_over_queue_i(c, a, i, 0, excl) == 
+        ensures sum_over_queue_i(c, a, i, 0, excl) ==
         sum_over_queue_i(c, a, i, 1, excl) + queue_at_n_orca_z(c, a, 0)
-    
+
     lemma rcvORCA_preserves_INV_6(c: Config, a': ActorAddr, c': Config)
         requires INV_6(c)
         requires rcvORCA(c, a', c')
@@ -318,9 +318,9 @@ abstract module Opaque{
             0 < n <= queue_length(c', a) &&
             j >= n &&
             queue_at_n_orca(c', a, j) &&
-            queue_at_n_orca_i(c', a, j) == i 
-            ensures orca_effect(c', a, i, 0, n) + orca_effect(c', a, i, n, queue_length(c', a)) > 0
-        
+            queue_at_n_orca_i(c', a, j) == i
+            ensures orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c', a)) > 0
+
         {
             if a == a' {
                 var i_0 := queue_at_n_orca_i(c, a', 0);
@@ -341,43 +341,41 @@ abstract module Opaque{
                     assert sum_over_queue_i(c, a', i_0, 0, 1) == z_0;
                     assert queue_at_n_orca(c, a, j+1);
                     assert queue_at_n_orca_i(c, a, j+1) == i;
-                    //assert orca_effect(c', a, i, n) > 0;
 
-                    /*
-                    assert orca_effect(c, a, i, 0, n) + orca_effect(c, a, i, n, queue_length(c, a)) > 0;
-                    sum_over_queue_is_recursive(c, a, i, n);
-                    assert sum_over_queue_i(c, a, i, 0, n) == 
-                        sum_over_queue_i(c, a, i, 1, n) + z_0;
-                    receive_orca_effect(c, a, c', i, 1, n);
-                    assert sum_over_queue_i(c', a, i, 0, n-1) == sum_over_queue_i(c, a, i, 1, n);
-                    */
                     assert queue_length(c, a) == queue_length(c', a) + 1;
                     sum_over_queue_is_recursive(c, a, i, n+1);
                     assert sum_over_queue_i(c, a, i, 1, n+1) + z_0 == sum_over_queue_i(c, a, i, 0, n+1);
                     receive_orca_effect(c, a, c', i, 1, n+1);
                     assert sum_over_queue_i(c', a, i, 0, n) == sum_over_queue_i(c, a, i, 1, n+1);
-                    assert orca_effect(c', a, i, 0, n) == orca_effect(c, a, i, 0, n+1);                   
-                    
-                            
-                     
+                    assert orca_effect(c', a, i, 0, n) == orca_effect(c, a, i, 0, n+1);
 
                     receive_orca_effect(c, a, c', i, n+1, queue_length(c, a));
-                    assert orca_effect(c', a, i, n, queue_length(c, a) - 1) == orca_effect(c, a, i, n+1, queue_length(c, a));
+                    assert sum_over_queue_i(c', a, i, n, queue_length(c, a) - 1) ==
+                        sum_over_queue_i(c, a, i, n+1, queue_length(c, a));
 
-                    assert orca_effect(c', a, i, 0, n) + orca_effect(c', a, i, n, queue_length(c, a) - 1) > 0;
-                    assert orca_effect(c', a, i, 0, n) + orca_effect(c', a, i, n, queue_length(c', a)) > 0;
-                     
+
+                    assert orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c, a) - 1) > 0;
+                    assert orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c', a)) > 0;
+
                 } else { assume false; }
             } else {
                 assume false;
             }
         }
-        
+
 
         forall i, a, n: nat |
                 Owner(c', i, a) &&
                 n <= queue_length(c', a)
                 ensures LRC(c', i) + sum_over_queue_i(c', a, i, 0, n) >= 0
+        {
+            assume false;
+        }
+
+        forall c, a, i, j: nat |
+                queue_at_n_orca(c, a, j) &&
+                queue_at_n_orca_i(c, a, j) == i
+                ensures LRC(c, i) > 0
         {
             assume false;
         }
