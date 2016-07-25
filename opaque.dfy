@@ -108,8 +108,9 @@ abstract module Opaque{
             Owner(c, i, a_own) &&
             is_a_message_path(c, mp)) ==>
             LRC(c, i) > 0
-
     }
+
+    
     predicate is_a_message_path(c: Config, mp: DP)
 
     predicate INV_3(c: Config) {
@@ -127,7 +128,7 @@ abstract module Opaque{
     ////RcvApp////
     predicate RcvApp(c: Config, a: ActorAddr, c': Config)
         requires actor_state_idle(c, a)
-        requires queue_head_app(c, a)
+        requires queue_at_n_app(c, a, 0)
     {
         actor_state_rcv(c', a) &&
         //0 here, 1 in the paper, leave which one?
@@ -146,7 +147,7 @@ abstract module Opaque{
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
         actor_state_rcv(c, a) &&
-        queue_head_app(c, a) &&
+        queue_at_n_app(c, a, 0) &&
         actor_state_exe(c', a) &&
         actor_state_exe_frame(c', a) == frame_from_app_message_n(c,a,0) &&
         pop(c, a, c') &&
@@ -189,8 +190,12 @@ abstract module Opaque{
     ////AUXILIARY FOR RcvApp////
     predicate actor_state_idle(c: Config, a: ActorAddr)
 
-    predicate queue_head_app(c: Config, a: ActorAddr)
-        ensures queue_length(c, a) > 0
+    predicate queue_at_n_app(c: Config, a: ActorAddr, n: nat)
+        ensures queue_at_n_app(c, a, n) ==> n <= queue_length(c, a)
+    {
+        WF_queue(c, a) &&
+        queue_n(c, a, n).app?
+    }
 
     predicate actor_state_rcv(c: Config, a: ActorAddr)
 
@@ -200,9 +205,9 @@ abstract module Opaque{
     function actor_ws(c: Config, a: ActorAddr) : set<Addr>
         requires actor_state_rcv(c, a)
 
-    function queue_head_iotas(c: Config, a: ActorAddr) : set<Addr>
-        requires queue_head_app(c, a)
-
+    function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
+        requires queue_at_n_app(c, a, n)
+    
     predicate Owner(c: Config, i: Addr, a: ActorAddr)
 
     predicate actor_state_exe(c: Config, a: ActorAddr)
@@ -335,7 +340,8 @@ abstract module Opaque{
 
                     assert LRC(c', i_0) == LRC(c, i_0) + z_0;
                     assert orca_effect(c, a', i_0, 0, 1) >= 0;
-                    assert LRC(c, i_0) + sum_over_queue_i(c, a', i_0, 0, 1) == orca_effect(c, a', i_0, 0, 1);
+                    assert LRC(c, i_0) + sum_over_queue_i(c, a', i_0, 0, 1) == 
+                        orca_effect(c, a', i_0, 0, 1);
                     assert LRC(c, i_0) + sum_over_queue_i(c, a', i_0, 0, 1) >= 0;
                     sum_over_orca_head_is_add_z(c, i_0, a');
                     assert sum_over_queue_i(c, a', i_0, 0, 1) == z_0;
@@ -381,53 +387,9 @@ abstract module Opaque{
         }
     }
 
-    /*
-    lemma rcvORCA_preserves_INV_6(c: Config, a': ActorAddr, c': Config)
-        requires INV_6(c)
-        requires rcvORCA(c, a', c')
-        ensures INV_6(c')
-    {
-        rcvORCA_changes_LRC(c, a', c');
-        sum_over_orca_head_is_add_z(c);
-        sum_over_orca_head_is_add_z(c');
-        forall n: nat, m: nat, i, a |
-            Owner(c', i, a) &&
-            queue_at_n_orca(c', a, n) &&
-            queue_at_n_orca_i(c', a, n) == i &&
-            m < queue_length(c', a)
-            ensures LRC(c', i) > 0
-            ensures LRC(c', i) + sum_over_queue_i(c', a, i, m) >= 0
-         {
-             if a' == a {
-                assert true;
-             } else {
-                assert LRC(c', i) == LRC(c, i);
-                assert LRC(c', i) > 0;
-             }
-            /*
-            var z := queue_at_n_orca_z(c, a, 0);
-            var i' := queue_at_n_orca_i(c', a, 0);
-            assert LRC(c, i) + z == LRC(c, i) + sum_over_queue_i(c, a, i, 0);
-            assert LRC(c, i) + z > 0;
-            assert LRC(c', i) == LRC(c, i) + z;
-            assert LRC(c', i) > 0;
-            */
-         }
-    }
-    */
-    /*
-    lemma rcvORCA_preserves_INV_2(c: Config, a: ActorAddr, c': Config)
-        requires INV_2(c)
-        requires rcvORCA(c, a, c')
-        ensures INV_2(c')
-    {
-
-    } */
-
     predicate queue_head_orca(c: Config, a: ActorAddr)
     function queue_head_i(c: Config, a: ActorAddr) : Addr
     function queue_head_orca_z(c: Config, a: ActorAddr) : int
-
 
 
 //    lemma rcvORCA_changes_RC(c: Config, a: ActorAddr, c': Config)
