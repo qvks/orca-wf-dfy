@@ -239,6 +239,8 @@ abstract module Opaque{
     }
 
     function sum_over_queue_i(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
+    // SD Why have you turned the body into a comment?
+    // Whithout a body to this function it seems to me that all lemmas mentioning sum_over_queue_i are far too strong
     //    ensures forall a: ActorAddr, i: Addr ::
     //            queue_at_n_orca(c, a, 0) ==>
     //            sum_over_queue_i(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
@@ -258,9 +260,12 @@ abstract module Opaque{
         RC(c', i, a) == RC(c, i, a) + z &&
         (forall a' :: a' != a ==> unchanged_actor(c, a', c')) &&
         Ownership_Immutable(c, c')
+        // SD: what is state of actor a in c'? And what about the contents of actor's fields?
     }
 
     predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
+    // SD: If this predicate has no body, then we still need lemmas which promise
+    // that all observations about a in c wil be preserved in c'
 
     lemma sum_over_orca_head_is_add_z(c: Config, i: Addr, a: ActorAddr)
         requires queue_at_n_orca(c, a, 0)
@@ -271,14 +276,24 @@ abstract module Opaque{
         ensures LRC(c, i) == RC(c, i, a)
 
     lemma rcvORCA_changes_LRC(c: Config, a: ActorAddr, c': Config)
+    // SD name does seem to matcvh intention
         requires rcvORCA(c, a, c')
         ensures forall n: nat, a', i ::
             a' != a ==>
             LRC(c', i) == LRC(c, i) &&
+            // Why would this hold?
             n < queue_length(c', a') &&
+            // SD ***
+            // I do not see how the above works. It says, amonf other things
+            //               requires rcvORCA(c, a, c')
+            //               ensures forall n: nat::  n < queue_length(c', a')
+            // which seems false to me
             queue_length(c', a) == queue_length(c, a) ==>
             sum_over_queue_i(c', a', i, 0, n) == sum_over_queue_i(c, a, i, 0, n)
+            // SD and why woulf the above hold?
 
+    
+            
     predicate INV_6(c: Config) {
         forall i, a :: Owner(c, i, a) ==>
             (forall j: nat ::
@@ -328,6 +343,8 @@ abstract module Opaque{
 
         {
             if a == a' {
+            // SD I have not checked the body of this proof, but it seems far too long
+            // for what it is doing
                 var i_0 := queue_at_n_orca_i(c, a', 0);
                 if i == i_0 {
                     assert queue_n(c', a', j) == queue_n(c, a', j+1);
@@ -404,6 +421,7 @@ abstract module Opaque{
                 | mkU(ms: Marks) | trc(ms': Marks) | mkR(ms'': Marks) | cll(ms''': Marks)
     type Marks
     type Workset = set<Addr> //opaque - how?
+    // SD What is wrong with the above?
     datatype RU = R | U
     function Marks_to_RU(m: Marks) : RU
 
@@ -449,22 +467,26 @@ abstract module Opaque{
     function views(c: Config, a: ActorAddr, p:DP) : Capability
 
     lemma {:verify true} A1(a: Actor, sp: SP, f: FId, cappa: Capability)
-    requires sees(a.cl, SP.cons(sp, f)) == cappa //pass cappa as param instead?
+    requires sees(a.cl, SP.cons(sp, f)) == cappa  
     ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp) == cappa'
 
 
     lemma {:verify true} A2(a: Actor, sp: SP, f: FId)
     requires sees(a.cl, SP.cons(sp, f)) == WRITE
     ensures sees(a.cl, sp) == WRITE
+    
+    // SD Can you formulate and prove the dynamic version of A1 and A2?
 
     function C(c: Config, a: ActorAddr, dp: DP) : Addr
     function A(c: Config, a: ActorAddr, dp: DP) : (Addr, Capability)
+    // SD: How does the functrion A realte tpo predicate A? Why do you need both?
    /*
      predicate WF_A(c: Config, a: ActorAddr, dp: DP) {
         forall i: Addr :: ((exists k: Capability ::
         A(c,a,dp) == (i, k)) <==> (C(c,a,dp) == i && views(c,a,dp) == k
                                 || k == TAG && exists k', i', p' ::
                                 (p == Cons(p',) && A(c,a,p') == (i', k') && Owner(c, i') == i)))
+                                // SD: Does Dafny allow "Cons(p',)"
 
     }
     */
@@ -474,8 +496,17 @@ abstract module Opaque{
                                             ==> (exists k' :: A(c, a', p') == (i, k') ==> k' == TAG))
     } */
     predicate DFR(c: Config) {
+    // SD But you have already defined DFR earlier. 
+    // I am surprised Dafny does not give an error message.
+    // Aslpo, why do you have two definitions?
         forall a, a': ActorAddr, p, p': DP, i: Addr :: (a != a' && (exists k :: A(c, a, p) == (i, k) && k==WRITE)
                                             && exists k' :: A(c, a', p') == (i, k') ==> k' == TAG)
+    }
+    
+    predicate DFR'(c: Config) {
+        // SD's version
+        forall a, a': ActorAddr, p, p': DP, i: Addr, kappa :: 
+             a != a' &&  A(c, a, p) == (i, WRITE) &&  A(c, a', p') == (i, k') ==> k' == TAG 
     }
 
     ////AUXILIARY FUNCTION////
