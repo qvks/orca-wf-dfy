@@ -473,9 +473,12 @@ abstract module Opaque{
         forall a, a': ActorAddr, p, p': DP, i: Addr :: (a != a' && (exists k :: A(c, a, p) == (i, k) && k==WRITE)
                                             ==> (exists k' :: A(c, a', p') == (i, k') ==> k' == TAG))
     } */
-    predicate DFR(c: Config) {
-        forall a, a': ActorAddr, p, p': DP, i: Addr :: (a != a' && (exists k :: A(c, a, p) == (i, k) && k==WRITE)
-                                            && exists k' :: A(c, a', p') == (i, k') ==> k' == TAG)
+    predicate DRF(c: Config) {
+        forall a, a': ActorAddr, p, p', k: DP, i: Addr ::
+            a != a' && 
+            A(c, a, p) == (i, WRITE) &&
+            A(c, a', p') == (i, k) ==> 
+            k == TAG
     }
 
     ////AUXILIARY FUNCTION////
