@@ -71,9 +71,9 @@ abstract module Opaque{
         WF_queue(c, a) &&
         queue_length(c', a) == queue_length(c, a) - 1 &&
 
-        (forall n: nat :: 
+        (forall n: nat ::
             n >= 0 ==>
-            queue_n(c', a, n) == queue_n(c, a, n+1)) 
+            queue_n(c', a, n) == queue_n(c, a, n+1))
     }
 
     lemma {:verify false} pop_preserves_WF_queue(c: Config, a: ActorAddr, c': Config)
@@ -81,7 +81,7 @@ abstract module Opaque{
         ensures WF_queue(c', a)
     {
     }
-    
+
 
     ////REFERENCE COUNTS////
     function RC(c: Config, i: Addr, a: ActorAddr) : nat
@@ -103,7 +103,7 @@ abstract module Opaque{
 
     predicate is_a_message_path(c: Config, mp: DP)
 
-    ////INVARIANTS////
+    //////////////////////////////INVARIANTS///////////////////////////////
     predicate INV_2(c: Config) {
         forall i, dp, mp, k, a, a_own ::
             (A(c, a, dp, i, k) &&
@@ -124,20 +124,20 @@ abstract module Opaque{
 
     predicate INV_6(c: Config) {
         forall i, a :: Owner(c, i, a) ==>
-            
+
             (forall n: nat ::
                 n <= queue_length(c, a) ==>
                 LRC_plus_queue_effect(c, a, i, n) >= 0) &&
 
-            (forall a' :: 
-                a != a' && 
+            (forall a' ::
+                a != a' &&
                 live(c, a', i) ==>
                 forall j: nat ::
                     j <= queue_length(c, a) ==>
                     LRC_plus_queue_effect(c, a, i, j) > 0) &&
 
             (forall n: nat ::
-                n < queue_length(c, a) && 
+                n < queue_length(c, a) &&
                 msg_live(c, a, i, n) ==>
                 forall j: nat ::
                     j <= n ==>
@@ -166,24 +166,25 @@ abstract module Opaque{
     function queue_effect(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
 
     predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
-        
+
     predicate live(c: Config, a: ActorAddr, i: Addr) {
         exists k, dp ::
-            A(c, a, dp, i, k)    
+            A(c, a, dp, i, k)
     }
-        
+
     predicate msg_live(c: Config, a: ActorAddr, i: Addr, n: nat) {
         (exists k, mp ::
-            A(c, a, mp, i, k) && 
+            A(c, a, mp, i, k) &&
             is_a_message_path(c, mp) &&
             message_path_from_n(c, mp, n)) ||
         (queue_at_n_orca(c, a, n) &&
         queue_at_n_orca_i(c, a, n) == i)
     }
-        
-    predicate message_path_from_n(c: Config, mp: DP, n: nat)
 
+    predicate message_path_from_n(c: Config, mp: DP, n: nat)
     //////////////////////////
+
+    ///////////////////////////////////////////////////////////////////////////
 
     /////SYSTEM PROPERTIES/////
     predicate Ownership_Immutable(c: Config, c': Config)
@@ -192,9 +193,9 @@ abstract module Opaque{
     }
 
     lemma Ownership_Unique(c: Config)
-        ensures forall i, a, a' :: 
+        ensures forall i, a, a' ::
             Owner(c, i, a) &&
-            a != a' ==> 
+            a != a' ==>
             !Owner(c, i, a')
     ///////////////////////////
 
@@ -213,7 +214,7 @@ abstract module Opaque{
             A(c,a,mp,i,k)
     }
 
-    ////RcvToExe//// 
+    ////RcvToExe////
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
         actor_state_rcv(c, a) &&
@@ -257,8 +258,6 @@ abstract module Opaque{
         }
     }
 
-    
-
     ////AUXILIARY FOR RcvApp////
     predicate actor_state_idle(c: Config, a: ActorAddr)
 
@@ -279,7 +278,7 @@ abstract module Opaque{
 
     function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
         requires queue_at_n_app(c, a, n)
-        
+
     predicate Owner(c: Config, i: Addr, a: ActorAddr)
 
     predicate actor_state_exe(c: Config, a: ActorAddr)
@@ -309,7 +308,7 @@ abstract module Opaque{
     }
 
     ////AUXILIARY FOR rcvORCA////
-    predicate unchanged_actor(c: Config, a: ActorAddr, c': Config) 
+    predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
     {
         queue_length(c, a) == queue_length(c', a) &&
         forall i, n: nat :: msg_live(c, a, i, n) <==> msg_live(c', a, i, n)
@@ -339,25 +338,25 @@ abstract module Opaque{
         requires rcvORCA(c, a, c')
         requires msg_live(c', a, i, n)
         ensures msg_live(c, a, i, n+1)
- 
+
     lemma LRC_plus_queue_effect_shift(c: Config, a: ActorAddr, c': Config, i: Addr, k: nat)
         requires rcvORCA(c, a, c')
         ensures LRC_plus_queue_effect(c, a, i, k+1) == LRC_plus_queue_effect(c', a, i, k)
-        ensures forall a', i' :: a' != a && Owner(c, i', a') ==> 
+        ensures forall a', i' :: a' != a && Owner(c, i', a') ==>
                 LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
 
     lemma rcvORCA_accessibility_unaffected(c: Config, a: ActorAddr, i: Addr, c': Config)
         requires rcvORCA(c, a, c')
         requires queue_at_n_orca_i(c, a, 0) == i
-        ensures forall a', i :: 
+        ensures forall a', i ::
             a' != a ==>
-            (live(c, a', i) <==> 
+            (live(c, a', i) <==>
             live(c', a', i))
         ensures forall a, i' ::
             i != i' ==>
             (live(c, a, i') <==>
             live(c', a, i'))
-    
+
     //////////////////////////////
 
     lemma rcvORCA_preserves_INV_6(c: Config, a_own: ActorAddr, c': Config)
@@ -366,9 +365,9 @@ abstract module Opaque{
         requires rcvORCA(c, a_own, c')
         ensures INV_6(c')
     {
-        forall a, i, j: nat | 
+        forall a, i, j: nat |
                 Owner(c', i, a) &&
-                j <= queue_length(c', a) 
+                j <= queue_length(c', a)
                 ensures LRC_plus_queue_effect(c', a, i, j) >= 0
         {
             if a == a_own {
@@ -380,15 +379,15 @@ abstract module Opaque{
                 }
             } else {
                 LRC_plus_queue_effect_shift(c, a_own, c', i, j);
-                assert unchanged_actor(c, a, c'); 
+                assert unchanged_actor(c, a, c');
             }
-        } 
+        }
 
         forall a, a', i, j: nat |
             Owner(c', i, a) &&
-            a != a' && 
+            a != a' &&
             live(c', a', i) &&
-            j <= queue_length(c', a) 
+            j <= queue_length(c', a)
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
             var i_0 := queue_at_n_orca_i(c, a_own, 0);
@@ -398,16 +397,16 @@ abstract module Opaque{
             } else {
                 Ownership_Unique(c');
                 rcvORCA_accessibility_unaffected(c, a_own, i_0, c');
-                assert unchanged_actor(c, a, c'); 
+                assert unchanged_actor(c, a, c');
                 LRC_plus_queue_effect_shift(c, a_own, c', i, j);
             }
         }
 
         forall a, i, j: nat, n: nat |
             Owner(c', i, a) &&
-            n < queue_length(c', a) && 
+            n < queue_length(c', a) &&
             msg_live(c', a, i, n) &&
-            j <= n 
+            j <= n
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
             var i_0 := queue_at_n_orca_i(c, a_own, 0);
@@ -416,10 +415,10 @@ abstract module Opaque{
                 msg_live_pop(c, a, c', i, n);
             } else {
                 LRC_plus_queue_effect_shift(c, a_own, c', i, j);
-                assert unchanged_actor(c, a, c'); 
+                assert unchanged_actor(c, a, c');
             }
         }
     }
 }
-        
+
 
