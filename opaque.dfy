@@ -101,16 +101,6 @@ abstract module Opaque{
             k == TAG
     }
 
-    ////INVARIANTS////
-    predicate INV_2(c: Config) {
-        forall i, dp, mp, k, a, a_own ::
-            (A(c, a, dp, i, k) &&
-            !Owner(c, i, a)) ||
-            (A(c, a_own, mp, i, k) &&
-            Owner(c, i, a_own) &&
-            is_a_message_path(c, mp)) ==>
-            LRC(c, i) > 0
-    }
 
     
     predicate is_a_message_path(c: Config, mp: DP)
@@ -145,6 +135,12 @@ abstract module Opaque{
     {
         forall i, a' :: Owner(c, i, a') == Owner(c', i, a')
     }
+
+    lemma Ownership_Unique(c: Config)
+        ensures forall i, a, a' :: 
+            Owner(c, i, a) &&
+            a != a' ==> 
+            !Owner(c, i, a')
 
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
     {
@@ -250,19 +246,21 @@ abstract module Opaque{
         //            queue_effect(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
 
         predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
+        
         predicate live(c: Config, a: ActorAddr, i: Addr) {
             exists k, dp ::
                 A(c, a, dp, i, k)    
         }
         
-        predicate message_path_from_n(c: Config, mp: DP, n: nat)
-
         predicate msg_live(c: Config, a: ActorAddr, i: Addr, n: nat) {
             exists k, mp ::
                 A(c, a, mp, i, k) && 
                 is_a_message_path(c, mp) &&
                 message_path_from_n(c, mp, n)
         }
+        
+        predicate message_path_from_n(c: Config, mp: DP, n: nat)
+
 
         ////rcvORCA////
         predicate rcvORCA(c: Config, a: ActorAddr, c': Config)
@@ -355,7 +353,18 @@ abstract module Opaque{
         ensures forall a', i' :: a' != a && Owner(c, i', a') ==> 
                 LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
     
+    ////INVARIANTS////
+    predicate INV_2(c: Config) {
+        forall i, dp, mp, k, a, a_own ::
+            (A(c, a, dp, i, k) &&
+            !Owner(c, i, a)) ||
+            (A(c, a_own, mp, i, k) &&
+            Owner(c, i, a_own) &&
+            is_a_message_path(c, mp)) ==>
+            LRC(c, i) > 0
+    }
 
+    lemma rcvORCA_preserves_INV_2(c: Config, a_own: ActorAddr, c': Config)
     lemma rcvORCA_preserves_INV_6(c: Config, a_own: ActorAddr, c': Config)
         requires INV_6(c)
         requires INV_2(c)
@@ -387,7 +396,21 @@ abstract module Opaque{
             j <= queue_length(c', a) 
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
-            assume false;
+            if a == a_own {
+                var i_0 := queue_at_n_orca_i(c, a, 0);
+                if i == i_0 {
+                    assume false;
+                } else {
+                    Ownership_Unique(c);
+                    assert !Owner(c, i, a');
+                    assert exists dp, k :: A(c', a', dp, i, k);
+                         
+                    assert LRC_plus_queue_effect(c, a, i, j) > 0;
+                    LRC_plus_queue_effect_shift(c, a, c', i, j);
+                }
+            } else {
+                assume false;
+            }
         }
 
         forall a, i, j: nat, n: nat |
