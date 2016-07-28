@@ -253,10 +253,12 @@ abstract module Opaque{
         }
         
         predicate msg_live(c: Config, a: ActorAddr, i: Addr, n: nat) {
-            exists k, mp ::
+            (exists k, mp ::
                 A(c, a, mp, i, k) && 
                 is_a_message_path(c, mp) &&
-                message_path_from_n(c, mp, n)
+                message_path_from_n(c, mp, n)) ||
+            (queue_at_n_orca(c, a, n) &&
+            queue_at_n_orca_i(c, a, n) == i)
         }
         
         predicate message_path_from_n(c: Config, mp: DP, n: nat)
@@ -321,9 +323,7 @@ abstract module Opaque{
 
             (forall n: nat ::
                 n < queue_length(c, a) && 
-                (msg_live(c, a, i, n) ||
-                (queue_at_n_orca(c, a, n) &&
-                queue_at_n_orca_i(c, a, n) == i)) ==>
+                msg_live(c, a, i, n) ==>
                 forall j: nat ::
                     j <= n ==>
                     LRC_plus_queue_effect(c, a, i, j) > 0)
@@ -433,10 +433,8 @@ abstract module Opaque{
         forall a, i, j: nat, n: nat |
             Owner(c', i, a) &&
             n < queue_length(c', a) && 
-            (msg_live(c', a, i, n) ||
-            (queue_at_n_orca(c', a, n) &&
-            queue_at_n_orca_i(c', a, n) == i)) &&
-            j <= n
+            msg_live(c', a, i, n) &&
+            j <= n 
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
             assume false;
