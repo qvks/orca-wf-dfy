@@ -283,7 +283,8 @@ abstract module Opaque{
 
         predicate unchanged_actor(c: Config, a: ActorAddr, c': Config) 
         {
-            queue_length(c, a) == queue_length(c', a)
+            queue_length(c, a) == queue_length(c', a) &&
+            forall i, n: nat :: msg_live(c, a, i, n) <==> msg_live(c', a, i, n)
         }
         // SD: If this predicate has no body, then we still need lemmas which promise
         // that all observations about a in c wil be preserved in c'
@@ -341,6 +342,11 @@ abstract module Opaque{
         requires excl>=incl
         ensures queue_effect(c', a, i, incl-1, excl-1) == queue_effect(c, a, i, incl, excl)
 
+    lemma msg_live_pop(c: Config, a: ActorAddr, c': Config, i: Addr, n: nat)
+        requires rcvORCA(c, a, c')
+        requires msg_live(c', a, i, n)
+        ensures msg_live(c, a, i, n+1)
+ 
     lemma queue_effects_recursive(c: Config, a: ActorAddr, i: Addr, excl: nat)
         requires queue_at_n_orca(c, a, 0)
         requires queue_at_n_orca_i(c, a, 0) == i
@@ -386,7 +392,6 @@ abstract module Opaque{
             LRC(c, i) > 0
     }
 
-    lemma rcvORCA_preserves_INV_2(c: Config, a_own: ActorAddr, c': Config)
     lemma rcvORCA_preserves_INV_6(c: Config, a_own: ActorAddr, c': Config)
         requires INV_6(c)
         requires INV_2(c)
@@ -437,7 +442,14 @@ abstract module Opaque{
             j <= n 
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
-            assume false;
+            var i_0 := queue_at_n_orca_i(c, a_own, 0);
+            if a == a_own {
+                LRC_plus_queue_effect_shift(c, a, c', i, j);
+                msg_live_pop(c, a, c', i, n);
+            } else {
+                LRC_plus_queue_effect_shift(c, a_own, c', i, j);
+                assert unchanged_actor(c, a, c'); 
+            }
         }
     }
 }
