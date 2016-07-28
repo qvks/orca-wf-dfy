@@ -70,8 +70,10 @@ abstract module Opaque{
     {
         WF_queue(c, a) &&
         queue_length(c', a) == queue_length(c, a) - 1 &&
-        forall n: nat :: n >= 0 ==>
-        queue_n(c', a, n) == queue_n(c, a, n+1)
+
+        (forall n: nat :: 
+            n >= 0 ==>
+            queue_n(c', a, n) == queue_n(c, a, n+1)) 
     }
 
     lemma {:verify false} pop_preserves_WF_queue(c: Config, a: ActorAddr, c': Config)
@@ -79,6 +81,7 @@ abstract module Opaque{
         ensures WF_queue(c', a)
     {
     }
+    
 
     ////REFERENCE COUNTS////
     function RC(c: Config, i: Addr, a: ActorAddr) : nat
@@ -88,7 +91,6 @@ abstract module Opaque{
     function AMC(c: Config, i: Addr) : int
     //{|(set x | exists a,k :: 0<=k<queue_length(c, a) && x==(a,k) && Reach(c,a,k,i))|}
 
-    predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
 
     ////DATA RACE FREEDOM////
     predicate DFR(c: Config) {
@@ -141,7 +143,7 @@ abstract module Opaque{
 
     predicate Ownership_Immutable(c: Config, c': Config)
     {
-        forall i, a' :: Owner(c,i,a') == Owner(c',i,a')
+        forall i, a' :: Owner(c, i, a') == Owner(c', i, a')
     }
 
     predicate RcvToExe(c: Config, a: ActorAddr, c': Config)
@@ -187,134 +189,223 @@ abstract module Opaque{
         }
     }
 
-    ////AUXILIARY FOR RcvApp////
-    predicate actor_state_idle(c: Config, a: ActorAddr)
-
-    predicate queue_at_n_app(c: Config, a: ActorAddr, n: nat)
-        ensures queue_at_n_app(c, a, n) ==> n <= queue_length(c, a)
-    {
-        WF_queue(c, a) &&
-        queue_n(c, a, n).app?
-    }
-
-    predicate actor_state_rcv(c: Config, a: ActorAddr)
-
-    function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
-        requires n < queue_length(c, a)
-
-    function actor_ws(c: Config, a: ActorAddr) : set<Addr>
-        requires actor_state_rcv(c, a)
-
-    function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
-        requires queue_at_n_app(c, a, n)
     
-    predicate Owner(c: Config, i: Addr, a: ActorAddr)
 
-    predicate actor_state_exe(c: Config, a: ActorAddr)
+        ////AUXILIARY FOR RcvApp////
+        predicate actor_state_idle(c: Config, a: ActorAddr)
 
-    function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame
+        predicate queue_at_n_app(c: Config, a: ActorAddr, n: nat)
+            ensures queue_at_n_app(c, a, n) ==> n <= queue_length(c, a)
+        {
+            WF_queue(c, a) &&
+            queue_n(c, a, n).app?
+        }
 
-    function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
+        predicate actor_state_rcv(c: Config, a: ActorAddr)
 
-    ///////////////PSEUDO CODE FOR RECEIVING AN ORCA MESSAGE (FIGURE 7)///////////////
+        function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
+            requires n < queue_length(c, a)
 
+        function actor_ws(c: Config, a: ActorAddr) : set<Addr>
+            requires actor_state_rcv(c, a)
 
-    ////AUXILIARY FOR INV_6////
-    predicate queue_at_n_orca(c: Config, a: ActorAddr, n: nat)
-        ensures queue_at_n_orca(c, a, n) ==> n <= queue_length(c, a)
-    {
-        WF_queue(c, a) &&
-        queue_n(c, a, n).orca?
-    }
+        function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
+            requires queue_at_n_app(c, a, n)
+        
+        predicate Owner(c: Config, i: Addr, a: ActorAddr)
 
-    function queue_at_n_orca_i(c: Config, a: ActorAddr, n: nat) : Addr
-        requires queue_at_n_orca(c, a, n)
-    {
-        queue_n(c, a, n).i
-    }
-    function queue_at_n_orca_z(c: Config, a: ActorAddr, n: nat) : int
-        requires queue_at_n_orca(c, a, n)
-    {
-        queue_n(c, a, n).z
-    }
+        predicate actor_state_exe(c: Config, a: ActorAddr)
 
-    function sum_over_queue_i(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
-    //    ensures forall a: ActorAddr, i: Addr ::
-    //            queue_at_n_orca(c, a, 0) ==>
-    //            sum_over_queue_i(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
+        function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame
+
+        function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
+
+        ///////////////PSEUDO CODE FOR RECEIVING AN ORCA MESSAGE (FIGURE 7)///////////////
 
 
-    ////rcvORCA////
-    predicate rcvORCA(c: Config, a: ActorAddr, c': Config)
-    {
-        queue_at_n_orca(c, a, 0) &&
-        var i := queue_at_n_orca_i(c, a, 0);
-        var z := queue_at_n_orca_z(c, a, 0);
+        ////AUXILIARY FOR INV_6////
+        predicate queue_at_n_orca(c: Config, a: ActorAddr, n: nat)
+            ensures queue_at_n_orca(c, a, n) ==> n <= queue_length(c, a)
+        {
+            WF_queue(c, a) &&
+            queue_n(c, a, n).orca?
+        }
 
-        Owner(c, i, a) &&
-        queue_at_n_orca(c, a, 0) &&
-        actor_state_idle(c, a) &&
-        pop(c, a, c') &&
-        RC(c', i, a) == RC(c, i, a) + z &&
-        (forall a' :: a' != a ==> unchanged_actor(c, a', c')) &&
-        Ownership_Immutable(c, c')
-    }
+        function queue_at_n_orca_i(c: Config, a: ActorAddr, n: nat) : Addr
+            requires queue_at_n_orca(c, a, n)
+        {
+            queue_n(c, a, n).i
+        }
+        function queue_at_n_orca_z(c: Config, a: ActorAddr, n: nat) : int
+            requires queue_at_n_orca(c, a, n)
+        {
+            queue_n(c, a, n).z
+        }
 
-    predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
+        function queue_effect(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
+        // SD Why have you turned the body into a comment?
+        // Whithout a body to this function it seems to me that all lemmas mentioning queue_effect are far too strong
+        //    ensures forall a: ActorAddr, i: Addr ::
+        //            queue_at_n_orca(c, a, 0) ==>
+        //            queue_effect(c, a, queue_at_n_orca_i(c, a, 0), 0) == queue_at_n_orca_z(c, a, 0)
 
-    lemma sum_over_orca_head_is_add_z(c: Config, i: Addr, a: ActorAddr)
-        requires queue_at_n_orca(c, a, 0)
-        ensures sum_over_queue_i(c, a, queue_at_n_orca_i(c, a, 0), 0, 1) == queue_at_n_orca_z(c, a, 0)
+        predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
+        predicate live(c: Config, a: ActorAddr, i: Addr) {
+            exists k, dp ::
+                A(c, a, dp, i, k)    
+        }
+        
+        predicate message_path_from_n(c: Config, mp: DP, n: nat)
 
-    lemma LRC_is_owner_RC(c: Config, i: Addr, a: ActorAddr)
-        requires Owner(c, i, a)
-        ensures LRC(c, i) == RC(c, i, a)
+        predicate msg_live(c: Config, a: ActorAddr, i: Addr, n: nat) {
+            exists k, mp ::
+                A(c, a, mp, i, k) && 
+                is_a_message_path(c, mp) &&
+                message_path_from_n(c, mp, n)
+        }
 
-    lemma rcvORCA_changes_LRC(c: Config, a: ActorAddr, c': Config)
-        requires rcvORCA(c, a, c')
-        ensures forall n: nat, a', i ::
-            a' != a ==>
-            LRC(c', i) == LRC(c, i) &&
-            n < queue_length(c', a') &&
+        ////rcvORCA////
+        predicate rcvORCA(c: Config, a: ActorAddr, c': Config)
+        {
+            queue_at_n_orca(c, a, 0) &&
+            var i := queue_at_n_orca_i(c, a, 0);
+            var z := queue_at_n_orca_z(c, a, 0);
+
+            Owner(c, i, a) &&
+            queue_at_n_orca(c, a, 0) &&
+            actor_state_idle(c, a) &&
+            pop(c, a, c') &&
+            RC(c', i, a) == RC(c, i, a) + z &&
+            (forall a' :: a' != a ==> unchanged_actor(c, a', c')) &&
+            Ownership_Immutable(c, c')
+            // SD: what is state of actor a in c'? And what about the contents of actor's fields?
+        }
+
+        predicate unchanged_actor(c: Config, a: ActorAddr, c': Config) 
+        {
+            queue_length(c, a) == queue_length(c', a)
+        }
+        // SD: If this predicate has no body, then we still need lemmas which promise
+        // that all observations about a in c wil be preserved in c'
+
+        lemma sum_over_orca_head_is_add_z(c: Config, i: Addr, a: ActorAddr)
+            requires queue_at_n_orca(c, a, 0)
+            ensures queue_effect(c, a, queue_at_n_orca_i(c, a, 0), 0, 1) == queue_at_n_orca_z(c, a, 0)
+
+        lemma LRC_is_owner_RC(c: Config, i: Addr, a: ActorAddr)
+            requires Owner(c, i, a)
+            ensures LRC(c, i) == RC(c, i, a)
+
+        /*lemma rcvORCA_changes_LRC(c: Config, a: ActorAddr, c': Config)
+            requires rcvORCA(c, a, c')
+            ensures forall n: nat, a', i ::
+                a' != a ==>
+                RC(c', a', i) == RC(c, a', i) &&
+            n < queue_length(c', a') && 
             queue_length(c', a) == queue_length(c, a) ==>
-            sum_over_queue_i(c', a', i, 0, n) == sum_over_queue_i(c, a, i, 0, n)
-
+            queue_effect(c', a', i, 0, n) == queue_effect(c, a', i, 0, n)
+        */
+    
+            
     predicate INV_6(c: Config) {
         forall i, a :: Owner(c, i, a) ==>
-            (forall j: nat ::
-                queue_at_n_orca(c, a, j) &&
-                queue_at_n_orca_i(c, a, j) == i ==>
-                LRC(c, i) > 0) &&
-            (forall n: nat ::
-                0 < n <= queue_length(c, a) ==>
-                    (forall j: nat ::
-                        j >= n ==>
-                            queue_at_n_orca(c, a, j) &&
-                            queue_at_n_orca_i(c, a, j) == i ==>
-                            orca_effect(c, a, i, 0, n) + sum_over_queue_i(c, a, i, n, queue_length(c,a)) > 0)) &&
+            
             (forall n: nat ::
                 n <= queue_length(c, a) ==>
-                orca_effect(c, a, i, 0, n) >= 0)
+                LRC_plus_queue_effect(c, a, i, n) >= 0) &&
+
+            (forall a' :: 
+                a != a' && 
+                live(c, a', i) ==>
+                forall j: nat ::
+                    j <= queue_length(c, a) ==>
+                    LRC_plus_queue_effect(c, a, i, j) > 0) &&
+
+            (forall n: nat ::
+                n < queue_length(c, a) && 
+                (msg_live(c, a, i, n) ||
+                (queue_at_n_orca(c, a, n) &&
+                queue_at_n_orca_i(c, a, n) == i)) ==>
+                forall j: nat ::
+                    j <= n ==>
+                    LRC_plus_queue_effect(c, a, i, j) > 0)
     }
 
-    function orca_effect(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
+
+    function LRC_plus_queue_effect(c: Config, a: ActorAddr, i: Addr, excl: nat) : int
     {
-        LRC(c, i) + sum_over_queue_i(c, a, i, incl, excl)
+        LRC(c, i) + queue_effect(c, a, i, 0, excl)
     }
 
-    lemma receive_orca_effect(c: Config, a: ActorAddr, c': Config, i: Addr, incl: nat, excl: nat)
+    lemma queue_effect_pop(c: Config, a: ActorAddr, c': Config, i: Addr, incl: nat, excl: nat)
         requires rcvORCA(c, a, c')
         requires incl>0
         requires excl>=incl
-        ensures sum_over_queue_i(c', a, i, incl-1, excl-1) == sum_over_queue_i(c, a, i, incl, excl)
+        ensures queue_effect(c', a, i, incl-1, excl-1) == queue_effect(c, a, i, incl, excl)
 
-    lemma sum_over_queue_is_recursive(c: Config, a: ActorAddr, i: Addr, excl: nat)
+    lemma queue_effects_recursive(c: Config, a: ActorAddr, i: Addr, excl: nat)
         requires queue_at_n_orca(c, a, 0)
         requires queue_at_n_orca_i(c, a, 0) == i
-        ensures sum_over_queue_i(c, a, i, 0, excl) ==
-        sum_over_queue_i(c, a, i, 1, excl) + queue_at_n_orca_z(c, a, 0)
+        ensures queue_effect(c, a, i, 0, excl) ==
+        queue_effect(c, a, i, 1, excl) + queue_at_n_orca_z(c, a, 0)
+    
+    lemma LRC_plus_queue_effect_shift(c: Config, a: ActorAddr, c': Config, i: Addr, k: nat)
+        requires rcvORCA(c, a, c')
+        ensures LRC_plus_queue_effect(c, a, i, k+1) == LRC_plus_queue_effect(c', a, i, k)
+        ensures forall a', i' :: a' != a && Owner(c, i', a') ==> 
+                LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
+    
 
-    lemma rcvORCA_preserves_INV_6(c: Config, a': ActorAddr, c': Config)
+    lemma rcvORCA_preserves_INV_6(c: Config, a_own: ActorAddr, c': Config)
+        requires INV_6(c)
+        requires INV_2(c)
+        requires rcvORCA(c, a_own, c')
+        ensures INV_6(c')
+    {
+        forall a, i, j: nat | 
+                Owner(c', i, a) &&
+                j <= queue_length(c', a) 
+                ensures LRC_plus_queue_effect(c', a, i, j) >= 0
+        {
+            if a == a_own {
+                var i_0 := queue_at_n_orca_i(c, a, 0);
+                if i == i_0 {
+                    LRC_plus_queue_effect_shift(c, a, c', i, j);
+                } else {
+                    LRC_plus_queue_effect_shift(c, a, c', i, j);
+                }
+            } else {
+                LRC_plus_queue_effect_shift(c, a_own, c', i, j);
+                assert unchanged_actor(c, a, c'); 
+            }
+        } 
+
+        forall a, a', i, j: nat |
+            Owner(c', i, a) &&
+            a != a' && 
+            live(c', a', i) &&
+            j <= queue_length(c', a) 
+            ensures LRC_plus_queue_effect(c', a, i, j) > 0
+        {
+            assume false;
+        }
+
+        forall a, i, j: nat, n: nat |
+            Owner(c', i, a) &&
+            n < queue_length(c', a) && 
+            (msg_live(c', a, i, n) ||
+            (queue_at_n_orca(c', a, n) &&
+            queue_at_n_orca_i(c', a, n) == i)) &&
+            j <= n
+            ensures LRC_plus_queue_effect(c', a, i, j) > 0
+        {
+            assume false;
+        }
+    }
+}
+        
+    /*    
+    lemma rcvORCA_preserves_INV_6'(c: Config, a': ActorAddr, c': Config)
         requires INV_6(c)
         requires rcvORCA(c, a', c')
         ensures INV_6(c')
@@ -324,10 +415,12 @@ abstract module Opaque{
             j >= n &&
             queue_at_n_orca(c', a, j) &&
             queue_at_n_orca_i(c', a, j) == i
-            ensures orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c', a)) > 0
+            ensures LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c', a)) > 0
 
         {
             if a == a' {
+            // SD I have not checked the body of this proof, but it seems far too long
+            // for what it is doing
                 var i_0 := queue_at_n_orca_i(c, a', 0);
                 if i == i_0 {
                     assert queue_n(c', a', j) == queue_n(c, a', j+1);
@@ -339,29 +432,29 @@ abstract module Opaque{
                     LRC_is_owner_RC(c', i_0, a');
 
                     assert LRC(c', i_0) == LRC(c, i_0) + z_0;
-                    assert orca_effect(c, a', i_0, 0, 1) >= 0;
-                    assert LRC(c, i_0) + sum_over_queue_i(c, a', i_0, 0, 1) == 
-                        orca_effect(c, a', i_0, 0, 1);
-                    assert LRC(c, i_0) + sum_over_queue_i(c, a', i_0, 0, 1) >= 0;
+                    assert LRC_plus_queue_effect(c, a', i_0, 0, 1) >= 0;
+                    assert LRC(c, i_0) + queue_effect(c, a', i_0, 0, 1) == 
+                        LRC_plus_queue_effect(c, a', i_0, 0, 1);
+                    assert LRC(c, i_0) + queue_effect(c, a', i_0, 0, 1) >= 0;
                     sum_over_orca_head_is_add_z(c, i_0, a');
-                    assert sum_over_queue_i(c, a', i_0, 0, 1) == z_0;
+                    assert queue_effect(c, a', i_0, 0, 1) == z_0;
                     assert queue_at_n_orca(c, a, j+1);
                     assert queue_at_n_orca_i(c, a, j+1) == i;
 
                     assert queue_length(c, a) == queue_length(c', a) + 1;
-                    sum_over_queue_is_recursive(c, a, i, n+1);
-                    assert sum_over_queue_i(c, a, i, 1, n+1) + z_0 == sum_over_queue_i(c, a, i, 0, n+1);
-                    receive_orca_effect(c, a, c', i, 1, n+1);
-                    assert sum_over_queue_i(c', a, i, 0, n) == sum_over_queue_i(c, a, i, 1, n+1);
-                    assert orca_effect(c', a, i, 0, n) == orca_effect(c, a, i, 0, n+1);
+                    queue_effects_recursive(c, a, i, n+1);
+                    assert queue_effect(c, a, i, 1, n+1) + z_0 == queue_effect(c, a, i, 0, n+1);
+                    queue_effect_pop(c, a, c', i, 1, n+1);
+                    assert queue_effect(c', a, i, 0, n) == queue_effect(c, a, i, 1, n+1);
+                    assert LRC_plus_queue_effect(c', a, i, 0, n) == LRC_plus_queue_effect(c, a, i, 0, n+1);
 
-                    receive_orca_effect(c, a, c', i, n+1, queue_length(c, a));
-                    assert sum_over_queue_i(c', a, i, n, queue_length(c, a) - 1) ==
-                        sum_over_queue_i(c, a, i, n+1, queue_length(c, a));
+                    queue_effect_pop(c, a, c', i, n+1, queue_length(c, a));
+                    assert queue_effect(c', a, i, n, queue_length(c, a) - 1) ==
+                        queue_effect(c, a, i, n+1, queue_length(c, a));
 
 
-                    assert orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c, a) - 1) > 0;
-                    assert orca_effect(c', a, i, 0, n) + sum_over_queue_i(c', a, i, n, queue_length(c', a)) > 0;
+                    assert LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c, a) - 1) > 0;
+                    assert LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c', a)) > 0;
 
                 } else { assume false; }
             } else {
@@ -373,7 +466,7 @@ abstract module Opaque{
         forall i, a, n: nat |
                 Owner(c', i, a) &&
                 n <= queue_length(c', a)
-                ensures LRC(c', i) + sum_over_queue_i(c', a, i, 0, n) >= 0
+                ensures LRC(c', i) + queue_effect(c', a, i, 0, n) >= 0
         {
             assume false;
         }
@@ -404,6 +497,7 @@ abstract module Opaque{
                 | mkU(ms: Marks) | trc(ms': Marks) | mkR(ms'': Marks) | cll(ms''': Marks)
     type Marks
     type Workset = set<Addr> //opaque - how?
+    // SD What is wrong with the above?
     datatype RU = R | U
     function Marks_to_RU(m: Marks) : RU
 
@@ -449,25 +543,34 @@ abstract module Opaque{
     function views(c: Config, a: ActorAddr, p:DP) : Capability
 
     lemma {:verify true} A1(a: Actor, sp: SP, f: FId, cappa: Capability)
-    requires sees(a.cl, SP.cons(sp, f)) == cappa //pass cappa as param instead?
+    requires sees(a.cl, SP.cons(sp, f)) == cappa  
     ensures exists cappa' :: cappa' != TAG && sees(a.cl, sp) == cappa'
 
 
     lemma {:verify true} A2(a: Actor, sp: SP, f: FId)
     requires sees(a.cl, SP.cons(sp, f)) == WRITE
     ensures sees(a.cl, sp) == WRITE
+    
+    // SD Can you formulate and prove the dynamic version of A1 and A2?
 
     function C(c: Config, a: ActorAddr, dp: DP) : Addr
     function A(c: Config, a: ActorAddr, dp: DP) : (Addr, Capability)
+    // SD: How does the functrion A realte tpo predicate A? Why do you need both?
    /*
      predicate WF_A(c: Config, a: ActorAddr, dp: DP) {
         forall i: Addr :: ((exists k: Capability ::
         A(c,a,dp) == (i, k)) <==> (C(c,a,dp) == i && views(c,a,dp) == k
                                 || k == TAG && exists k', i', p' ::
                                 (p == Cons(p',) && A(c,a,p') == (i', k') && Owner(c, i') == i)))
+                                // SD: Does Dafny allow "Cons(p',)"
 
     }
     */
+
+predicate live(c: Config, a: ActorAddr, dp: DP) {
+    exists a, k ::
+        A(c, a, dp) == (a, k)
+}
     /*
     predicate DFR(c: Config) {
         forall a, a': ActorAddr, p, p': DP, i: Addr :: (a != a' && (exists k :: A(c, a, p) == (i, k) && k==WRITE)
@@ -479,6 +582,19 @@ abstract module Opaque{
             A(c, a, p) == (i, WRITE) &&
             A(c, a', p') == (i, k) ==> 
             k == TAG
+
+    predicate DFR(c: Config) {
+    // SD But you have already defined DFR earlier. 
+    // I am surprised Dafny does not give an error message.
+    // Aslpo, why do you have two definitions?
+        forall a, a': ActorAddr, p, p': DP, i: Addr :: (a != a' && (exists k :: A(c, a, p) == (i, k) && k==WRITE)
+                                            && exists k' :: A(c, a', p') == (i, k') ==> k' == TAG)
+    }
+    
+    predicate DFR'(c: Config) {
+        // SD's version
+        forall a, a': ActorAddr, p, p': DP, i: Addr, kappa :: 
+             a != a' &&  A(c, a, p) == (i, WRITE) &&  A(c, a', p') == (i, k') ==> k' == TAG 
     }
 
     ////AUXILIARY FUNCTION////
