@@ -454,92 +454,11 @@ abstract module Opaque{
     }
 }
         
-    /*    
-    lemma rcvORCA_preserves_INV_6'(c: Config, a': ActorAddr, c': Config)
-        requires INV_6(c)
-        requires rcvORCA(c, a', c')
-        ensures INV_6(c')
-    {
-        forall n: nat, j: nat, a, i |
-            0 < n <= queue_length(c', a) &&
-            j >= n &&
-            queue_at_n_orca(c', a, j) &&
-            queue_at_n_orca_i(c', a, j) == i
-            ensures LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c', a)) > 0
-
-        {
-            if a == a' {
-            // SD I have not checked the body of this proof, but it seems far too long
-            // for what it is doing
-                var i_0 := queue_at_n_orca_i(c, a', 0);
-                if i == i_0 {
-                    assert queue_n(c', a', j) == queue_n(c, a', j+1);
-                    assert queue_at_n_orca(c, a', j+1);
-                    var z_0 := queue_at_n_orca_z(c, a', 0);
-                    assert Owner(c, i, a');
-                    assert RC(c', i_0, a') == RC(c, i_0, a') + z_0;
-                    LRC_is_owner_RC(c, i_0, a');
-                    LRC_is_owner_RC(c', i_0, a');
-
-                    assert LRC(c', i_0) == LRC(c, i_0) + z_0;
-                    assert LRC_plus_queue_effect(c, a', i_0, 0, 1) >= 0;
-                    assert LRC(c, i_0) + queue_effect(c, a', i_0, 0, 1) == 
-                        LRC_plus_queue_effect(c, a', i_0, 0, 1);
-                    assert LRC(c, i_0) + queue_effect(c, a', i_0, 0, 1) >= 0;
-                    sum_over_orca_head_is_add_z(c, i_0, a');
-                    assert queue_effect(c, a', i_0, 0, 1) == z_0;
-                    assert queue_at_n_orca(c, a, j+1);
-                    assert queue_at_n_orca_i(c, a, j+1) == i;
-
-                    assert queue_length(c, a) == queue_length(c', a) + 1;
-                    queue_effects_recursive(c, a, i, n+1);
-                    assert queue_effect(c, a, i, 1, n+1) + z_0 == queue_effect(c, a, i, 0, n+1);
-                    queue_effect_pop(c, a, c', i, 1, n+1);
-                    assert queue_effect(c', a, i, 0, n) == queue_effect(c, a, i, 1, n+1);
-                    assert LRC_plus_queue_effect(c', a, i, 0, n) == LRC_plus_queue_effect(c, a, i, 0, n+1);
-
-                    queue_effect_pop(c, a, c', i, n+1, queue_length(c, a));
-                    assert queue_effect(c', a, i, n, queue_length(c, a) - 1) ==
-                        queue_effect(c, a, i, n+1, queue_length(c, a));
-
-
-                    assert LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c, a) - 1) > 0;
-                    assert LRC_plus_queue_effect(c', a, i, 0, n) + queue_effect(c', a, i, n, queue_length(c', a)) > 0;
-
-                } else { assume false; }
-            } else {
-                assume false;
-            }
-        }
-
-
-        forall i, a, n: nat |
-                Owner(c', i, a) &&
-                n <= queue_length(c', a)
-                ensures LRC(c', i) + queue_effect(c', a, i, 0, n) >= 0
-        {
-            assume false;
-        }
-
-        forall c, a, i, j: nat |
-                queue_at_n_orca(c, a, j) &&
-                queue_at_n_orca_i(c, a, j) == i
-                ensures LRC(c, i) > 0
-        {
-            assume false;
-        }
-    }
-
-    predicate queue_head_orca(c: Config, a: ActorAddr)
-    function queue_head_i(c: Config, a: ActorAddr) : Addr
-    function queue_head_orca_z(c: Config, a: ActorAddr) : int
-
 
 //    lemma rcvORCA_changes_RC(c: Config, a: ActorAddr, c': Config)
 //        requires rcvORCA(c, a, c')
 
 
-}
 
 /* IGNORE
     //States//
