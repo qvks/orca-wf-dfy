@@ -352,7 +352,29 @@ abstract module Opaque{
         ensures LRC_plus_queue_effect(c, a, i, k+1) == LRC_plus_queue_effect(c', a, i, k)
         ensures forall a', i' :: a' != a && Owner(c, i', a') ==> 
                 LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
-    
+
+    lemma rcvORCA_accessibility_unaffected(c: Config, a: ActorAddr, i: Addr, c': Config)
+        requires rcvORCA(c, a, c')
+        requires queue_at_n_orca_i(c, a, 0) == i
+        ensures forall a', i :: 
+            a' != a ==>
+            (live(c, a', i) <==> 
+            live(c', a', i))
+        ensures forall a, i' ::
+            i != i' ==>
+            (live(c, a, i') <==>
+            live(c', a, i'))
+     /* 
+    lemma rcvORCA_changes_LRC_only(c: Config, a: ActorAddr, i: Addr, c': Config)
+        requires rcvORCA(c, a, c')
+        requires queue_at_n_orca_i(c, a, 0) == i
+        ensures forall a', i ::
+            a' != a ==>
+            LRC(c, i) == LRC(c', i)
+        ensures forall i' ::
+            i' != i ==>
+            LRC(c, i) == LRC(c', i)
+    */
     ////INVARIANTS////
     predicate INV_2(c: Config) {
         forall i, dp, mp, k, a, a_own ::
@@ -396,20 +418,15 @@ abstract module Opaque{
             j <= queue_length(c', a) 
             ensures LRC_plus_queue_effect(c', a, i, j) > 0
         {
+            var i_0 := queue_at_n_orca_i(c, a_own, 0);
             if a == a_own {
-                var i_0 := queue_at_n_orca_i(c, a, 0);
-                if i == i_0 {
-                    assume false;
-                } else {
-                    Ownership_Unique(c);
-                    assert !Owner(c, i, a');
-                    assert exists dp, k :: A(c', a', dp, i, k);
-                         
-                    assert LRC_plus_queue_effect(c, a, i, j) > 0;
-                    LRC_plus_queue_effect_shift(c, a, c', i, j);
-                }
+                rcvORCA_accessibility_unaffected(c, a_own, i_0, c');
+                LRC_plus_queue_effect_shift(c, a, c', i, j);
             } else {
-                assume false;
+                Ownership_Unique(c');
+                rcvORCA_accessibility_unaffected(c, a_own, i_0, c');
+                assert unchanged_actor(c, a, c'); 
+                LRC_plus_queue_effect_shift(c, a_own, c', i, j);
             }
         }
 
