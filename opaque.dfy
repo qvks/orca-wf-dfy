@@ -46,8 +46,13 @@ abstract module Opaque{
     }
 
     predicate WF_queue(c: Config, a: ActorAddr) {
-        (forall n: nat :: n < queue_length(c,a) ==> queue_n(c, a, n) != Msg.ERR) &&
-        (forall n: nat :: n >= queue_length(c,a) ==> queue_n(c,a,n) == Msg.ERR)
+        (forall n: nat :: 
+            n < queue_length(c,a) ==> 
+            queue_n(c, a, n) != Msg.ERR) &&
+
+        (forall n: nat :: 
+            n >= queue_length(c,a) ==> 
+            queue_n(c,a,n) == Msg.ERR)
     }
 
     predicate push(c: Config, a: ActorAddr, msg: Msg, c': Config)
@@ -56,8 +61,10 @@ abstract module Opaque{
         msg != Msg.ERR &&
         queue_length(c', a) == queue_length(c, a) + 1 &&
         queue_n(c', a, queue_length(c,a)) == msg &&
-        (forall n: nat :: n != queue_length(c,a) ==>
-        queue_n(c', a, n) == queue_n(c, a, n))
+
+        (forall n: nat :: 
+            n != queue_length(c,a) ==>
+            queue_n(c', a, n) == queue_n(c, a, n))
     }
 
     lemma {:verify false} push_preserves_WF_queue(c: Config, a: ActorAddr, msg: Msg, c': Config)
@@ -94,7 +101,7 @@ abstract module Opaque{
 
     ////DATA RACE FREEDOM////
     predicate DRF(c: Config) {
-        forall a, a': ActorAddr, p, p': DP, i: Addr, k: Capability::
+        forall a, a': ActorAddr, p, p': DP, i: Addr, k: Capability ::
             a != a' &&
             A(c, a, p, i, WRITE) &&
             A(c, a', p', i, k) ==>
@@ -189,7 +196,8 @@ abstract module Opaque{
     /////SYSTEM PROPERTIES/////
     predicate Ownership_Immutable(c: Config, c': Config)
     {
-        forall i, a' :: Owner(c, i, a') == Owner(c', i, a')
+        forall i, a' :: 
+            Owner(c, i, a') == Owner(c', i, a')
     }
 
     lemma Ownership_Unique(c: Config)
@@ -222,18 +230,41 @@ abstract module Opaque{
         actor_state_exe(c', a) &&
         actor_state_exe_frame(c', a) == frame_from_app_message_n(c,a,0) &&
         pop(c, a, c') &&
-        (forall i :: i in actor_ws(c,a) && Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) - 1) &&
-        (forall i :: i in actor_ws(c,a) && !Owner(c, i, a) ==> RC(c', i, a) == RC(c, i, a) + 1) &&
-        (forall i :: i !in actor_ws(c,a) ==> RC(c', i, a) == RC(c, i, a)) &&
         Ownership_Immutable(c, c') &&
-        (forall i, a' :: a' != a ==> RC(c', i, a') == RC(c, i, a'))
+
+        (forall i :: 
+            i in actor_ws(c,a) && 
+            Owner(c, i, a) ==> 
+            RC(c', i, a) == RC(c, i, a) - 1) &&
+
+        (forall i :: 
+            i in actor_ws(c,a) && 
+            !Owner(c, i, a) ==> 
+            RC(c', i, a) == RC(c, i, a) + 1) &&
+
+        (forall i :: 
+            i !in actor_ws(c,a) ==> 
+            RC(c', i, a) == RC(c, i, a)) &&
+
+        (forall i, a' :: 
+            a' != a ==> 
+            RC(c', i, a') == RC(c, i, a'))
     }
 
     lemma {:verify true} RcvToExe_Increases_A(c: Config, a: ActorAddr, c': Config)
         requires RcvToExe(c, a, c')
-        ensures forall lp, i, k :: A(c, a, lp, i, k) ==> A(c', a, lp, i, k)
-        ensures forall lp, i, k :: A(c', a, lp, i, k) ==> A(c, a, lp, i, k) || i in actor_ws(c, a)
-        ensures forall lp, i, k, a' :: a' != a ==> A(c', a', lp, i, k) == A(c, a', lp, i, k)
+        ensures forall lp, i, k :: 
+            A(c, a, lp, i, k) ==> 
+            A(c', a, lp, i, k)
+
+        ensures forall lp, i, k :: 
+            A(c', a, lp, i, k) ==> 
+            A(c, a, lp, i, k) || 
+            i in actor_ws(c, a)
+
+        ensures forall lp, i, k, a' :: 
+            a' != a ==> 
+            A(c', a', lp, i, k) == A(c, a', lp, i, k)
 
 
     lemma {:verify true} RcvToExe_Preserves_INV_3(c: Config, a': ActorAddr, c': Config)
@@ -302,16 +333,21 @@ abstract module Opaque{
         actor_state_idle(c, a) &&
         pop(c, a, c') &&
         RC(c', i, a) == RC(c, i, a) + z &&
-        (forall a' :: a' != a ==> unchanged_actor(c, a', c')) &&
-        Ownership_Immutable(c, c')
-        // SD: what is state of actor a in c'? And what about the contents of actor's fields?
+        Ownership_Immutable(c, c') &&
+
+        (forall a' :: 
+            a' != a ==>
+            unchanged_actor(c, a', c')) 
+        //TODO: SD: what is state of actor a in c'? And what about the contents of actor's fields?
     }
 
     ////AUXILIARY FOR rcvORCA////
     predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
     {
         queue_length(c, a) == queue_length(c', a) &&
-        forall i, n: nat :: msg_live(c, a, i, n) <==> msg_live(c', a, i, n)
+        forall i, n: nat ::
+            msg_live(c, a, i, n) <==> 
+            msg_live(c', a, i, n)
     }
 
     lemma sum_over_orca_head_is_add_z(c: Config, i: Addr, a: ActorAddr)
@@ -342,8 +378,10 @@ abstract module Opaque{
     lemma LRC_plus_queue_effect_shift(c: Config, a: ActorAddr, c': Config, i: Addr, k: nat)
         requires rcvORCA(c, a, c')
         ensures LRC_plus_queue_effect(c, a, i, k+1) == LRC_plus_queue_effect(c', a, i, k)
-        ensures forall a', i' :: a' != a && Owner(c, i', a') ==>
-                LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
+        ensures forall a', i' ::
+            a' != a &&
+            Owner(c, i', a') ==>
+            LRC_plus_queue_effect(c, a', i', k) == LRC_plus_queue_effect(c', a', i', k)
 
     lemma rcvORCA_accessibility_unaffected(c: Config, a: ActorAddr, i: Addr, c': Config)
         requires rcvORCA(c, a, c')
