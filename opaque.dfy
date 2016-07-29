@@ -10,7 +10,7 @@ abstract module Opaque{
     type Config
     type Actor
     type Frame
-    datatype Msg = orca(i: Addr, z: int) | app(f: Frame) | ERR
+    datatype Msg = orca(i: Addr, z: int) | app(is: set<Addr>, b: BId) | ERR
     function Heap(c: Config, i: Addr, fid: FId) : Addr
     function allocated_addresses(c: Config) : set<Addr>
 
@@ -129,6 +129,14 @@ abstract module Opaque{
     }
 
 
+    predicate INV_4(c: Config) {
+        forall i ::
+            LRC(c, i) + OMC(c, i) == FRC(c, i) + AMC(c, i)
+    }
+
+    predicate INV_5(c: Config) 
+    //RC returns a nat. Therefore, INV_5 holds implicitly
+
     predicate INV_6(c: Config) {
         forall i, a :: Owner(c, i, a) ==>
 
@@ -164,6 +172,7 @@ abstract module Opaque{
     {
         queue_n(c, a, n).i
     }
+
     function queue_at_n_orca_z(c: Config, a: ActorAddr, n: nat) : int
         requires queue_at_n_orca(c, a, n)
     {
@@ -242,6 +251,12 @@ abstract module Opaque{
             !Owner(c, i, a) ==> 
             RC(c', i, a) == RC(c, i, a) + 1) &&
 
+        state_atomic(c, a, c')
+    }
+
+    predicate state_atomic(c: Config, a: ActorAddr, c': Config) 
+        requires actor_state_rcv(c, a) || actor_state_snd(c, a)
+    {
         (forall i :: 
             i !in actor_ws(c,a) ==> 
             RC(c', i, a) == RC(c, i, a)) &&
@@ -299,16 +314,25 @@ abstract module Opaque{
         queue_n(c, a, n).app?
     }
 
+    function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
+        requires queue_at_n_app(c, a, n)
+    {
+        queue_n(c, a, n).is
+    }
+    
+    function queue_at_n_app_b(c: Config, a: ActorAddr, n: nat) : BId
+        requires queue_at_n_app(c, a, n)
+    {
+        queue_n(c, a, n).b
+    }
+
     predicate actor_state_rcv(c: Config, a: ActorAddr)
 
     function paths_from_message_n(c: Config, a: ActorAddr, n: nat) : set<DP>
         requires n < queue_length(c, a)
 
     function actor_ws(c: Config, a: ActorAddr) : set<Addr>
-        requires actor_state_rcv(c, a)
-
-    function queue_at_n_app_is(c: Config, a: ActorAddr, n: nat) : set<Addr>
-        requires queue_at_n_app(c, a, n)
+        requires actor_state_rcv(c, a) || actor_state_snd(c, a)
 
     predicate Owner(c: Config, i: Addr, a: ActorAddr)
 
@@ -357,7 +381,6 @@ abstract module Opaque{
     lemma LRC_is_owner_RC(c: Config, i: Addr, a: ActorAddr)
         requires Owner(c, i, a)
         ensures LRC(c, i) == RC(c, i, a)
-
 
     function LRC_plus_queue_effect(c: Config, a: ActorAddr, i: Addr, excl: nat) : int
     {
@@ -456,6 +479,69 @@ abstract module Opaque{
                 assert unchanged_actor(c, a, c');
             }
         }
+    }
+
+    ///////////////PSEUDO CODE FOR SENDING MESSAGES (FIGURE 8)///////////////
+    
+    ////ExeToSnd////
+    predicate ExeToSnd(c: Config, a: ActorAddr, c': Config) 
+        
+    predicate actor_state_snd(c: Config, a: ActorAddr)
+
+    function actor_state_snd_frame(c: Config, a: ActorAddr) : Frame
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_msg(c: Config, a: ActorAddr) : Msg 
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_msg_b(c: Config, a: ActorAddr) : BId
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_msg_is(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_ws(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_a'(c: Config, a: ActorAddr) : ActorAddr
+        requires actor_state_snd(c, a)
+    
+    ////SndToExe////
+    predicate SndToExe(c: Config, a: ActorAddr, c': Config) {
+        actor_state_snd(c, a) &&
+        Ownership_Immutable(c, c') &&
+        state_atomic(c, a, c') &&
+
+        (forall i :: 
+            i in actor_state_snd_ws(c, a) && 
+            Owner(c, i, a) ==> 
+            RC(c', i, a) == RC(c, i, a) + 1) &&
+
+        (forall i :: 
+            i in actor_state_snd_ws(c, a) &&
+            !Owner(c, i, a) &&
+            RC(c, i, a) > 1 ==>
+            RC(c', i, a) == RC(c, i, a) - 1) &&
+    
+        (forall i, a_own :: 
+            i in actor_state_snd_ws(c, a) &&
+            Owner(c, i, a_own) &&
+            !Owner(c, i, a) &&
+            RC(c, i, a) <= 1 ==>
+
+            queue_at_n_orca(c', a, 0) &&
+            queue_at_n_orca_i(c', a, 0) == i &&
+            queue_at_n_orca_z(c', a, 0) == 256 &&
+            
+            RC(c', i, a) == RC(c, i, a) + 256) &&
+
+            var a' := actor_state_snd_a'(c, a); 
+
+            queue_at_n_app(c', a', 0) &&
+            queue_at_n_app_is(c', a', 0) == actor_state_snd_msg_is(c, a) &&
+            queue_at_n_app_b(c', a', 0) == actor_state_snd_msg_b(c, a) &&
+            actor_state_exe(c', a) &&
+            actor_state_exe_frame(c', a) == actor_state_snd_frame(c, a)
     }
 }
 
