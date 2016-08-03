@@ -10,7 +10,9 @@ abstract module Opaque{
     type Config
     type Actor
     type Frame
-    datatype Msg = orca(i: Addr, z: int) | app(is: set<Addr>, b: BId) | ERR
+    //old app constructor app(is, b) left in for backwards compatibility
+    //leave only the app(f) in later
+    datatype Msg = orca(i: Addr, z: int) | app(is: set<Addr>, b: BId) | app'(f: Frame)| ERR
     function Heap(c: Config, i: Addr, fid: FId) : Addr
     function allocated_addresses(c: Config) : set<Addr>
 
@@ -159,7 +161,6 @@ abstract module Opaque{
 
     function queue_effect(c: Config, a: ActorAddr, i: Addr, incl: nat, excl: nat) : int
 
-    predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
 
     predicate live(c: Config, a: ActorAddr, i: Addr) {
         exists k, dp ::
@@ -177,7 +178,9 @@ abstract module Opaque{
 
     predicate message_path_from_n(c: Config, mp: DP, n: nat)
     //////////////////////////
-
+    
+    predicate INV_8(c: Config) 
+         
     ///////////////////////////////////////////////////////////////////////////
 
     /////SYSTEM PROPERTIES/////
@@ -215,7 +218,7 @@ abstract module Opaque{
         actor_state_rcv(c, a) &&
         queue_at_n_app(c, a, 0) &&
         actor_state_exe(c', a) &&
-        actor_state_exe_frame(c', a) == frame_from_app_message_n(c, a, 0) &&
+        actor_state_exe_f(c', a) == frame_from_app_message_n(c, a, 0) &&
         pop(c, a, c') &&
         Ownership_Immutable(c, c') &&
 
@@ -305,8 +308,6 @@ abstract module Opaque{
 
     predicate actor_state_exe(c: Config, a: ActorAddr)
 
-    function actor_state_exe_frame(c: Config, a: ActorAddr) : Frame
-
     function frame_from_app_message_n(c: Config, a: ActorAddr, n: nat) : Frame
     ///////////////////////////
 
@@ -333,10 +334,17 @@ abstract module Opaque{
     }
 
     ////AUXILIARY FOR rcvORCA////
-
     lemma sum_over_orca_head_is_add_z(c: Config, i: Addr, a: ActorAddr)
         requires queue_at_n_orca(c, a, 0)
         ensures queue_effect(c, a, queue_at_n_orca_i(c, a, 0), 0, 1) == queue_at_n_orca_z(c, a, 0)
+    
+    lemma FRC_is_not_owner_RC(c: Config, i: Addr, actors: set<ActorAddr>) 
+        requires forall a ::    
+                    a in actors <==>
+                    !Owner(c, i, a) 
+        ensures FRC(c, i) == sum_over_set_RC(c, actors)
+
+    function sum_over_set_RC(c: Config, actors: set<ActorAddr>) : nat
 
     lemma LRC_is_owner_RC(c: Config, i: Addr, a: ActorAddr)
         requires Owner(c, i, a)
@@ -466,6 +474,9 @@ abstract module Opaque{
     function actor_state_snd_ws(c: Config, a: ActorAddr) : set<Addr>
         requires actor_state_snd(c, a)
 
+    function actor_state_snd_f'(c: Config, a: ActorAddr) : Frame
+        requires actor_state_snd(c, a)
+
     function actor_state_snd_a'(c: Config, a: ActorAddr) : ActorAddr
         requires actor_state_snd(c, a)
 
@@ -474,72 +485,151 @@ abstract module Opaque{
         queue_n(c, a, n).app?
     }
     
-    predicate live_from_stack(c: Config, i: Addr, a: ActorAddr)
+    predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
+
+    predicate accessible_via_lp(c: Config, i: Addr, a: ActorAddr) {
+        exists lp,k ::
+            A(c, a, lp, i, k)
+    }
+    
+    predicate split(f: Frame, f': Frame, f'': Frame) 
+    predicate ExeToSnd'(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config) 
+        requires actor_state_exe(c, a)
+        requires queue_at_n_app(c'', a', queue_length(c, a'))
+        requires forall x ::
+                    x in queue_at_n_app_f_rng(c'', a', queue_length(c, a')) ==>
+                    x in actor_state_exe_f_rng(c, a)
+        requires forall x ::
+                    x in queue_at_n_app_f_dom(c'', a', queue_length(c, a')) ==>
+                    x !in actor_state_exe_f_dom(c, a)
+
+    predicate subset(Set: set<Addr>, subset: set<Addr>) {
+        forall iota ::  
+            iota in subset ==>
+            iota in Set
+    }
+
+    predicate disjoint(Set: set<Addr>, Set': set<Addr>) {
+        forall iota ::  
+            iota in Set ==>
+            iota !in Set'
+    }
+    
+    function union(Set: set<Addr>, Set': set<Addr>) : set<Addr>
+    ensures forall iota ::
+            (iota in Set || 
+            iota in Set') ==>
+            iota in union(Set, Set')
+
+//these can be probably generalised into fewer methods - that is for later    
+    function msg_frame_rng(c: Config, msg: Msg) : set<Addr>
+    function msg_frame_dom(c: Config, msg: Msg) : set<Addr>
+
+    function actor_state_snd_f(c: Config, a: ActorAddr) : Frame 
+
+    function actor_state_snd_f_rng(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_f_dom(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_snd(c, a)
+
+    function actor_state_exe_f(c: Config, a: ActorAddr) : Frame 
+
+    function actor_state_exe_f_rng(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_exe(c, a)
+
+    function actor_state_exe_f_dom(c: Config, a: ActorAddr) : set<Addr>
+        requires actor_state_exe(c, a)
+
+    function queue_at_n_app_f_rng(c: Config, a: ActorAddr, n: nat) : set<Addr>
+        requires queue_at_n_app(c, a, n)
+
+    function queue_at_n_app_f_dom(c: Config, a: ActorAddr, n: nat) : set<Addr>
+        requires queue_at_n_app(c, a, n)
+    
+    function queue_at_n_app_f(c: Config, a: ActorAddr, n: nat) : Frame
+        requires queue_at_n_app(c, a, n)
 
     ////ExeToSnd////
-    predicate ExeToSnd(c: Config, a: ActorAddr, c': Config) 
+    predicate ExeToSnd(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config, msg: Msg) 
         requires actor_state_exe(c, a)
-        requires queue_at_n_app(c', a, 0)
-        requires forall i :: 
-                    i in queue_at_n_app_is(c', a, 0) ==>
-                    live_from_stack(c, i, a) 
-        requires DRF(c')
+        requires queue_at_n_app(c'', a', queue_length(c, a'))
+        requires push(c, a', msg, c'') 
+        requires msg.app?
+        requires subset(msg_frame_rng(c, msg), actor_state_exe_f_rng(c, a))
+        requires disjoint(msg_frame_dom(c, msg), actor_state_exe_f_dom(c, a))
+        requires DRF(c'')
+        
     {
         actor_state_snd(c', a) &&
+        actor_state_snd_a'(c', a) == a' &&
+        actor_state_snd_f'(c', a) == queue_at_n_app_f(c'', a', queue_length(c, a')) &&
+        actor_state_snd_f(c', a) == actor_state_exe_f(c, a) &&
+        actor_state_snd_ws(c', a) == {} &&
+        all_else_umodified(c, a, c')
+    }
 
-        (forall i :: 
-                i in actor_state_snd_ws(c', a) ==>
-                live_from_stack(c, i, a)) &&
+    ////SndToExe////
+    predicate SndToExe(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config, msg: Msg) 
+    {
+        actor_state_snd(c, a) &&
+        actor_state_snd_a'(c, a) == a' &&
 
-        actor_state_snd_frame(c', a) == actor_state_exe_frame(c, a) &&
+        var f := actor_state_snd_f(c, a);
+        var f' := actor_state_snd_f'(c, a);
+        var ws := actor_state_snd_ws(c, a);
         
         (forall i :: 
-                i in actor_state_snd_msg_is(c', a) ==>
-                live_from_stack(c, i, a)) 
-    }
-  
-    
-    ////SndToExe////
-    predicate SndToExe(c: Config, a: ActorAddr, c': Config) {
-        actor_state_snd(c, a) &&
-        Ownership_Immutable(c, c') &&
-        state_atomic(c, a, c') &&
-
-        (forall i :: 
-            i in actor_state_snd_ws(c, a) && 
+            i in ws && 
             Owner(c, i, a) ==> 
             RC(c', i, a) == RC(c, i, a) + 1) &&
 
         (forall i :: 
-            i in actor_state_snd_ws(c, a) &&
+            i in ws &&
             !Owner(c, i, a) &&
             RC(c, i, a) > 1 ==>
             RC(c', i, a) == RC(c, i, a) - 1) &&
     
         (forall i, a_own :: 
-            i in actor_state_snd_ws(c, a) &&
+            i in ws &&
             Owner(c, i, a_own) &&
-            !Owner(c, i, a) &&
+            a != a_own &&
             RC(c, i, a) <= 1 ==>
 
             RC(c', i, a) == RC(c, i, a) + 256 &&
 
-            queue_at_n_orca(c', a, 0) &&
-            queue_at_n_orca_i(c', a, 0) == i &&
-            queue_at_n_orca_z(c', a, 0) == 256) &&
+            push(c, a_own, orca(i, 256), c') &&
 
-            var a' := actor_state_snd_a'(c, a); 
+            actor_state_exe_f(c', a) == f &&
 
-            queue_at_n_app(c', a', 0) &&
-            queue_at_n_app_is(c', a', 0) == actor_state_snd_msg_is(c, a) &&
-            queue_at_n_app_b(c', a', 0) == actor_state_snd_msg_b(c, a) &&
-            actor_state_exe(c', a) &&
-            actor_state_exe_frame(c', a) == actor_state_snd_frame(c, a)
+            push(c, a', app'(f'), c'))
     }
-    
-    lemma SndToExe_preserves_INV_4(c: Config, a: ActorAddr, c': Config)
+
+    predicate Reachable(c: Config, iota: Addr, a: ActorAddr, f: Frame)
+
+    function frame_union_domain(c: Config, f: Frame, f': Frame) : set<Addr>
+    function all_reachable(c: Config, a: ActorAddr, f: Frame) : set<Addr>
+    function frame_dom(f: Frame) : set<VarId>
+    function frame_rng(f: Frame) : set<Addr>
+
+    predicate ws_WF(c: Config, a: ActorAddr, f: Frame, f': Frame)
+        requires actor_state_snd(c, a)
+    {
+        var ws := actor_state_snd_ws(c, a);
+        forall iota ::
+            Reachable(c, iota, a, f) ==>
+            (iota in actor_state_snd_ws(c, a) ||
+            exists iota' ::
+                iota' in ws &&
+                subset(frame_rng(f'), ws) &&
+                subset(ws, all_reachable(c, a, f')))
+    }
+
+    //IF I PUSHED CHANGED RC FORALL REACHABLE - USE THIS 
+    lemma SndToExe_preserves_INV_4(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config, f': Frame, msg: Msg)
         requires INV_4(c)
-        requires SndToExe(c, a, c')
+        requires SndToExe(c, a, a', c', c'', msg)
+        requires ws_WF(c, a, actor_state_snd_f(c, a), actor_state_snd_f'(c, a))
         ensures INV_4(c') 
     {
         forall i |
@@ -561,7 +651,15 @@ abstract module Opaque{
             }
         }
     }
-    
+   
+ 
+    predicate all_else_umodified(c: Config, modified: ActorAddr, c': Config) 
+    {
+        forall a ::
+        a != modified ==>
+        unchanged_actor(c, a, c')
+    }
+
     predicate unchanged_actor(c: Config, a: ActorAddr, c': Config)
     {
         queue_length(c, a) == queue_length(c', a) &&
@@ -573,11 +671,12 @@ abstract module Opaque{
             RC(c, i, a) == RC(c', i, a))
     }
     
+
     predicate state_atomic(c: Config, a: ActorAddr, c': Config) 
         requires actor_state_rcv(c, a) || actor_state_snd(c, a)
     {
         (forall i :: 
-            i !in actor_ws(c,a) ==> 
+            i !in actor_ws(c, a) ==> 
             RC(c', i, a) == RC(c, i, a)) &&
 
         (forall i, a' :: 
@@ -611,3 +710,69 @@ abstract module Opaque{
 }
 
 
+ /*   
+    ////ExeToSnd////
+    predicate ExeToSnd(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config) 
+        requires actor_state_exe(c, a)
+        requires queue_at_n_app(c'', a', queue_length(c, a'))
+        requires forall i :: 
+                    i in queue_at_n_app_is(c'', a', queue_length(c, a')) ==>
+                    accessible_via_lp(c'', i, a)
+
+        requires DRF(c'')
+    {
+        actor_state_snd(c', a) &&
+
+        (forall i ::
+                i in actor_state_snd_ws(c', a) ==>
+                accessible_via_lp_deep(c, i, a)) &&
+        
+        (forall i :: 
+                i in actor_state_snd_msg_is(c', a) ==>
+                accessible_via_lp(c, i, a)) &&
+
+        actor_state_snd_frame(c', a) == actor_state_exe_f(c, a) 
+        
+    }
+  
+    
+    ////SndToExe////
+    predicate SndToExe(c: Config, a: ActorAddr, a': ActorAddr, c': Config) {
+        actor_state_snd(c, a) &&
+        Ownership_Immutable(c, c') &&
+        state_atomic(c, a, c') &&
+
+        (forall i :: 
+            i in actor_state_snd_ws(c, a) && 
+            Owner(c, i, a) ==> 
+            RC(c', i, a) == RC(c, i, a) + 1) &&
+
+        (forall i :: 
+            i in actor_state_snd_ws(c, a) &&
+            !Owner(c, i, a) &&
+            RC(c, i, a) > 1 ==>
+            RC(c', i, a) == RC(c, i, a) - 1) &&
+    
+        (forall i, a_own :: 
+            i in actor_state_snd_ws(c, a) &&
+            Owner(c, i, a_own) &&
+            !Owner(c, i, a) &&
+            RC(c, i, a) <= 1 ==>
+
+            RC(c', i, a) == RC(c, i, a) + 256 &&
+
+            queue_at_n_orca(c', a, 0) &&
+            queue_at_n_orca_i(c', a, 0) == i &&
+            queue_at_n_orca_z(c', a, 0) == 256) &&
+            
+            var a' := actor_state_snd_a'(c, a); 
+            var l := queue_length(c, a');
+
+            queue_at_n_app(c', a', l) &&
+            queue_at_n_app_is(c', a', l) == actor_state_snd_msg_is(c, a) &&
+            queue_at_n_app_b(c', a', l) == actor_state_snd_msg_b(c, a) &&
+
+            actor_state_exe(c', a) 
+            //actor_state_exe_f(c', a) == actor_state_snd_frame(c, a)
+    }
+*/
