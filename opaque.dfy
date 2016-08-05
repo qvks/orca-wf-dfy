@@ -56,6 +56,8 @@ abstract module Opaque{
                     a in actors <==>
                     !Owner(c, i, a) 
         ensures FRC(c, i) == sum_over_set_RC(c, actors)
+
+    function sum_over_set_RC(c: Config, actors: set<ActorAddr>) : nat
     /////////////////////////
 
 
@@ -70,7 +72,7 @@ abstract module Opaque{
     /////////////////////////
 
 
-    //////ACCESSIBILITY////// 
+    //////ACCESSIBILITY/REACHABILITY////// 
     predicate A(c: Config, a: ActorAddr, dp: DP, i: Addr, k: Capability)
 
     predicate accessible_via_lp(c: Config, i: Addr, a: ActorAddr) {
@@ -95,6 +97,10 @@ abstract module Opaque{
     }
 
     predicate message_path_from_n(c: Config, mp: DP, n: nat)
+
+    predicate Reachable(c: Config, iota: Addr, a: ActorAddr, f: Frame)
+
+    function all_reachable(c: Config, a: ActorAddr, f: Frame) : set<Addr>
     /////////////////////////
 
 
@@ -204,7 +210,13 @@ abstract module Opaque{
             !Owner(c, i, a) ==> 
             RC(c', i, a) == RC(c, i, a) + 1) &&
 
-        state_atomic(c, a, c')
+        (forall i :: 
+            i !in actor_ws(c, a) ==> 
+            RC(c', i, a) == RC(c, i, a)) &&
+
+        (forall i, a' :: 
+            a' != a ==> 
+            RC(c', i, a') == RC(c, i, a'))
     }
 
 
@@ -399,35 +411,6 @@ abstract module Opaque{
 
     ///////////////PSEUDO CODE FOR SENDING MESSAGES (FIGURE 8)///////////////
 
-    /////////Auxiliary for ExeToSnd and SndToExe////////// 
-    //these can be probably generalised into fewer methods - that is for later    
-
-    predicate actor_state_snd(c: Config, a: ActorAddr)
-
-    function actor_state_snd_msg(c: Config, a: ActorAddr) : Msg 
-        requires actor_state_snd(c, a)
-
-    function actor_state_snd_f'(c: Config, a: ActorAddr) : Frame
-        requires actor_state_snd(c, a)
-
-    function actor_state_snd_a'(c: Config, a: ActorAddr) : ActorAddr
-        requires actor_state_snd(c, a)
-     
-    function msg_f(c: Config, msg: Msg) : Frame
-
-    function actor_state_snd_f(c: Config, a: ActorAddr) : Frame 
-
-    function actor_state_exe_f(c: Config, a: ActorAddr) : Frame 
-
-    function queue_at_n_app_f(c: Config, a: ActorAddr, n: nat) : Frame
-        requires queue_at_n_app(c, a, n)
-
-    function frame_dom(f: Frame) : set<VarId>
-
-    function frame_rng(f: Frame) : set<Addr>
-
-    ////////////////////////////////////////////////////// 
-
     ////ExeToSnd////
     predicate ExeToSnd(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config, msg: Msg) 
         requires actor_state_exe(c, a)
@@ -486,6 +469,7 @@ abstract module Opaque{
             LRC(c', i) == LRC(c, i) &&
             FRC(c', i) == FRC(c, i) + 255) &&
 
+        actor_state_exe(c', a) &&
         actor_state_exe_f(c', a) == f &&
 
         (forall i ::
@@ -524,10 +508,34 @@ abstract module Opaque{
                     i in actor_ws(c, a) ==>
                     RC(c, i, a) >= 1
         
+    /////////Auxiliary for ExeToSnd and SndToExe////////// 
+    //these can be probably generalised into fewer methods - that is for later    
 
-    predicate Reachable(c: Config, iota: Addr, a: ActorAddr, f: Frame)
+    predicate actor_state_snd(c: Config, a: ActorAddr)
 
-    function all_reachable(c: Config, a: ActorAddr, f: Frame) : set<Addr>
+    function actor_state_snd_msg(c: Config, a: ActorAddr) : Msg 
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_f'(c: Config, a: ActorAddr) : Frame
+        requires actor_state_snd(c, a)
+
+    function actor_state_snd_a'(c: Config, a: ActorAddr) : ActorAddr
+        requires actor_state_snd(c, a)
+     
+    function msg_f(c: Config, msg: Msg) : Frame
+
+    function actor_state_snd_f(c: Config, a: ActorAddr) : Frame 
+        requires actor_state_snd(c, a)
+
+    function actor_state_exe_f(c: Config, a: ActorAddr) : Frame 
+        requires actor_state_exe(c, a)
+
+    function queue_at_n_app_f(c: Config, a: ActorAddr, n: nat) : Frame
+        requires queue_at_n_app(c, a, n)
+
+    function frame_dom(f: Frame) : set<VarId>
+
+    function frame_rng(f: Frame) : set<Addr>
 
 
     predicate ws_WF(c: Config, a: ActorAddr, f: Frame, f': Frame)
@@ -543,26 +551,6 @@ abstract module Opaque{
                 subset(ws, all_reachable(c, a, f')))
     }
 
-    lemma push_app_inc_AMC(c: Config, a: ActorAddr, a': ActorAddr, msg: Msg, c': Config)
-        requires msg.app'? 
-        requires actor_state_snd(c, a)
-        requires actor_state_snd_a'(c, a) == a'
-        requires push(c, a', msg, c')
-        ensures forall iota ::
-                Reachable(c, iota, a, msg.f) ==>
-                AMC(c', iota) == AMC(c, iota) + 1
-
-    lemma ws_is_reachable_from_msg(c: Config, a: ActorAddr, msg: Msg) 
-        requires actor_state_snd(c, a)
-        requires msg.app'?
-        requires actor_state_snd_msg(c, a) == msg
-        ensures forall iota ::
-                //IFF unless loop added
-                iota in actor_ws(c, a) <==>
-                Reachable(c, iota, a, msg.f)
-
-
-    function sum_over_set_RC(c: Config, actors: set<ActorAddr>) : nat
     
     predicate all_else_unmodified(c: Config, modified: ActorAddr, c': Config) 
     {
@@ -602,19 +590,7 @@ abstract module Opaque{
         (forall i ::
             RC(c, i, a) == RC(c', i, a))
     }
-
-    predicate state_atomic(c: Config, a: ActorAddr, c': Config) 
-        requires actor_state_rcv(c, a) || actor_state_snd(c, a)
-    {
-        (forall i :: 
-            i !in actor_ws(c, a) ==> 
-            RC(c', i, a) == RC(c, i, a)) &&
-
-        (forall i, a' :: 
-            a' != a ==> 
-            RC(c', i, a') == RC(c, i, a'))
-    }
-
+    ////////////////////////////////////////////////////// 
 
     ////////////////////ABSTRACT ADTs/////////////////////
 
@@ -693,6 +669,7 @@ abstract module Opaque{
     {
     }
 
+    //ORCA MESSAGES IN QUEUE//
     predicate queue_at_n_orca(c: Config, a: ActorAddr, n: nat)
         ensures queue_at_n_orca(c, a, n) ==> n <= queue_length(c, a)
     {
@@ -711,8 +688,8 @@ abstract module Opaque{
     {
         queue_n(c, a, n).z
     }
-
-
+    
+    //APP MESSAGES IN QUEUE//
     predicate queue_at_n_app(c: Config, a: ActorAddr, n: nat)
         ensures queue_at_n_app(c, a, n) ==> n <= queue_length(c, a)
     {
@@ -732,7 +709,6 @@ abstract module Opaque{
         queue_n(c, a, n).b
     }
     /////////////////////////
-
     ////////////////////////////////////////////////////// 
 
 }
