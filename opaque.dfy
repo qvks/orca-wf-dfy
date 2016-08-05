@@ -1,6 +1,7 @@
 /*
  * Var naming convention:
  * a: ActorAddr
+ * TODO: use iota not i
  * i: Addr
  * c: Config
  * st: State
