@@ -404,8 +404,6 @@ abstract module Opaque{
                 LRC_plus_queue_effect_shift(c, a_own, c', i, j);
                 assert unchanged_actor(c, a, c');
             }
-
-
         }
     }
 
@@ -477,7 +475,7 @@ abstract module Opaque{
             AMC(c', i) == AMC(c, i) + 1)
     }
 
-    lemma SndToExe_preserves_INV_4(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config, f': Frame)
+    lemma SndToExe_preserves_INV_4(c: Config, a: ActorAddr, a': ActorAddr, c': Config, c'': Config)
         requires INV_4(c)
         requires SndToExe(c, a, a', c', c'')
         requires ws_WF(c, a, actor_state_snd_f(c, a), actor_state_snd_f'(c, a))
@@ -487,26 +485,8 @@ abstract module Opaque{
         true 
         ensures LRC(c', i) + OMC(c', i) == FRC(c', i) + AMC(c', i) 
         {   
-            if (i in actor_ws(c, a)) {
-                if(Owner(c, i, a)) {
-                } else {
-                    if RC(c, i, a) > 1 {
-                    } else {
-                        can_reach_ws(c);
-                    }
-                }
-            } else {
-            }
         }
     }
-
-    lemma can_reach_ws(c: Config) 
-        ensures forall a ::
-                (actor_state_snd(c, a) ||
-                actor_state_rcv(c, a)) ==>
-                forall i ::
-                    i in actor_ws(c, a) ==>
-                    RC(c, i, a) >= 1
         
     /////////Auxiliary for ExeToSnd and SndToExe////////// 
     //these can be probably generalised into fewer methods - that is for later    
@@ -537,18 +517,22 @@ abstract module Opaque{
 
     function frame_rng(f: Frame) : set<Addr>
 
-
     predicate ws_WF(c: Config, a: ActorAddr, f: Frame, f': Frame)
         requires actor_state_snd(c, a)
     {
         var ws := actor_ws(c, a);
-        forall iota ::
+
+        (forall iota ::
             Reachable(c, iota, a, f) ==>
             (iota in actor_ws(c, a) ||
             exists iota' ::
                 iota' in ws &&
                 subset(frame_rng(f'), ws) &&
-                subset(ws, all_reachable(c, a, f')))
+                subset(ws, all_reachable(c, a, f')))) &&
+
+        (forall iota ::
+            iota in ws ==>
+            RC(c, iota, a) >= 1)
     }
 
     
@@ -647,7 +631,7 @@ abstract module Opaque{
             queue_n(c', a, n) == queue_n(c, a, n))
     }
 
-    lemma {:verify false} push_preserves_WF_queue(c: Config, a: ActorAddr, msg: Msg, c': Config)
+    lemma push_preserves_WF_queue(c: Config, a: ActorAddr, msg: Msg, c': Config)
         requires push(c, a, msg, c')
         ensures WF_queue(c', a)
     {
@@ -663,7 +647,7 @@ abstract module Opaque{
             queue_n(c', a, n) == queue_n(c, a, n+1))
     }
 
-    lemma {:verify false} pop_preserves_WF_queue(c: Config, a: ActorAddr, c': Config)
+    lemma pop_preserves_WF_queue(c: Config, a: ActorAddr, c': Config)
         requires pop(c, a, c')
         ensures WF_queue(c', a)
     {
