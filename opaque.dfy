@@ -39,7 +39,6 @@ abstract module Opaque{
     function Actors(c: Config, a: ActorAddr) : Actor
 
 
-
     ////REFERENCE COUNTS////
     function RC(c: Config, i: Addr, a: ActorAddr) : nat
     function OMC(c: Config, i: Addr) : int
@@ -579,6 +578,7 @@ abstract module Opaque{
     ////////////////////ABSTRACT ADTs/////////////////////
 
     ///////////SETS///////////
+    //TODO: make the set type generic
     predicate subset(Set: set<Addr>, subset: set<Addr>) {
         forall iota ::  
             iota in subset ==>
