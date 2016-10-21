@@ -25,7 +25,7 @@ abstract module Opaque{
     type Actor
     type Frame
     //old app constructor app(is, b) left in for backwards compatibility 
-    // with earlier versions of the paper
+    //with earlier versions of the paper
     datatype Msg = orca(iota: Addr, z: int) | app(is: set<Addr>, b: BId) | app'(f: Frame)| ERR
     function Heap(c: Config, iota: Addr, fid: FId) : Addr
     function allocated_addresses(c: Config) : set<Addr>
@@ -90,12 +90,12 @@ abstract module Opaque{
 
     //////ACCESSIBILITY/REACHABILITY////// 
 
-    // An actor can reach an object if there is a path from 
-    // the actor to the object 
+    //An actor can reach an object if there is a path from 
+    //the actor to the object 
     predicate Reachable(c: Config, iota: Addr, a: ActorAddr, f: Frame)
 
-    // An actor can access an object if there is a LEGAL path from 
-    // the actor to the object 
+    //An actor can access an object if there is a LEGAL path from 
+    //the actor to the object 
     predicate A(c: Config, a: ActorAddr, dp: DP, iota: Addr, k: Capability)
 
     predicate accessible_via_lp(c: Config, iota: Addr, a: ActorAddr) {
@@ -119,7 +119,7 @@ abstract module Opaque{
         queue_at_n_orca_i(c, a, n) == iota)
     }
     
-    // message path mp from n'th message in a queue
+    //message path mp from n'th message in a queue
     predicate message_path_from_n(c: Config, mp: DP, n: nat)
 
     function all_reachable(c: Config, a: ActorAddr, f: Frame) : set<Addr>
@@ -291,7 +291,7 @@ abstract module Opaque{
     function actor_ws(c: Config, a: ActorAddr) : set<Addr>
         requires actor_state_rcv(c, a) || actor_state_snd(c, a)
     
-    // a is iota's owner in c
+    //a is iota's owner in c
     predicate Owner(c: Config, iota: Addr, a: ActorAddr)
 
     predicate actor_state_exe(c: Config, a: ActorAddr)
